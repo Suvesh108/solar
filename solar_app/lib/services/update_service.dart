@@ -20,7 +20,7 @@ class UpdateInfo {
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.2';
+  static const String currentVersion = 'v0.0.3';
   static const String _repoReleasesUrl = 'https://api.github.com/repos/Suvesh108/solar/releases/latest';
 
   static Future<UpdateInfo?> checkForUpdate() async {

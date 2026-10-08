@@ -4,11 +4,13 @@ import 'models/lead.dart';
 import 'screens/calculator_screen.dart';
 import 'screens/leads_screen.dart';
 import 'screens/profile_screen.dart';
+import 'services/language_service.dart';
 import 'services/lead_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LanguageService.instance.init();
   await LeadService.instance.init();
   runApp(const SunwardSolarApp());
 }
@@ -61,6 +63,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   void _showOnboardingDialog() {
+    final lang = LanguageService.instance;
     final nameCtrl = TextEditingController();
 
     showDialog(
@@ -68,18 +71,20 @@ class _MainTabScreenState extends State<MainTabScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.paper,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Image.asset('assets/logo.png', height: 32, width: 32),
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset('assets/logo.png', height: 34, width: 34),
             ),
             const SizedBox(width: 10),
-            const Expanded(
+            Expanded(
               child: Text(
-                'Welcome to Sunward',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
+                lang.t('Welcome to Sunward', 'सनवर्ड में आपका स्वागत है'),
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -88,18 +93,21 @@ class _MainTabScreenState extends State<MainTabScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Aapka swagat hai! Please enter your name to personalize your app:',
-              style: TextStyle(fontSize: 13, color: AppColors.muted),
+            Text(
+              lang.t(
+                'Please enter your name to personalize your app experience:',
+                'कृपया अपना नाम दर्ज करें ताकि आपका ऐप सेटअप हो सके:',
+              ),
+              style: const TextStyle(fontSize: 13, color: AppColors.muted),
             ),
             const SizedBox(height: 14),
             TextField(
               controller: nameCtrl,
               autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Your Name / Aapka Naam *',
+              decoration: InputDecoration(
+                labelText: lang.t('Your Name *', 'आपका नाम *'),
                 hintText: 'e.g. Suvesh',
-                prefixIcon: Icon(Icons.person_outline),
+                prefixIcon: const Icon(Icons.person_outline),
               ),
             ),
           ],
@@ -112,7 +120,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.ink,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               onPressed: () async {
                 final input = nameCtrl.text.trim();
@@ -121,7 +129,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
                 await prefs.setString('user_name', finalName);
                 if (mounted) Navigator.pop(ctx);
               },
-              child: const Text('Get Started / Shuru Karein', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(
+                lang.t('Get Started', 'शुरू करें'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
@@ -131,49 +142,73 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: ValueListenableBuilder<List<Lead>>(
-        valueListenable: LeadService.instance.leadsNotifier,
-        builder: (context, leads, _) {
-          final newLeadsCount = leads.where((l) => l.status == LeadStatus.newLead).length;
+    final lang = LanguageService.instance;
 
-          return BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: (index) => setState(() => _currentIndex = index),
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.calculate_outlined),
-                activeIcon: Icon(Icons.calculate),
-                label: 'Calculator',
-              ),
-              BottomNavigationBarItem(
-                icon: Badge(
-                  isLabelVisible: newLeadsCount > 0,
-                  label: Text('$newLeadsCount'),
-                  backgroundColor: AppColors.coral,
-                  child: const Icon(Icons.people_alt_outlined),
+    return ValueListenableBuilder<AppLanguage>(
+      valueListenable: lang.languageNotifier,
+      builder: (context, _, __) {
+        return Scaffold(
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 280),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.02, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
                 ),
-                activeIcon: Badge(
-                  isLabelVisible: newLeadsCount > 0,
-                  label: Text('$newLeadsCount'),
-                  backgroundColor: AppColors.coral,
-                  child: const Icon(Icons.people_alt),
-                ),
-                label: 'Leads',
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: 'Profile',
-              ),
-            ],
-          );
-        },
-      ),
+              );
+            },
+            child: KeyedSubtree(
+              key: ValueKey<int>(_currentIndex),
+              child: _screens[_currentIndex],
+            ),
+          ),
+          bottomNavigationBar: ValueListenableBuilder<List<Lead>>(
+            valueListenable: LeadService.instance.leadsNotifier,
+            builder: (context, leads, _) {
+              final newLeadsCount = leads.where((l) => l.status == LeadStatus.newLead).length;
+
+              return BottomNavigationBar(
+                currentIndex: _currentIndex,
+                onTap: (index) => setState(() => _currentIndex = index),
+                items: [
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.calculate_outlined),
+                    activeIcon: const Icon(Icons.calculate),
+                    label: lang.t('Calculator', 'कैलकुलेटर'),
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Badge(
+                      isLabelVisible: newLeadsCount > 0,
+                      label: Text('$newLeadsCount'),
+                      backgroundColor: AppColors.coral,
+                      child: const Icon(Icons.people_alt_outlined),
+                    ),
+                    activeIcon: Badge(
+                      isLabelVisible: newLeadsCount > 0,
+                      label: Text('$newLeadsCount'),
+                      backgroundColor: AppColors.coral,
+                      child: const Icon(Icons.people_alt),
+                    ),
+                    label: lang.t('Leads', 'लीड्स'),
+                  ),
+                  BottomNavigationBarItem(
+                    icon: const Icon(Icons.person_outline),
+                    activeIcon: const Icon(Icons.person),
+                    label: lang.t('Profile', 'प्रोफाइल'),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

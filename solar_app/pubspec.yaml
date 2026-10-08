@@ -1,7 +1,7 @@
 name: solar_app
-description: "Sunward Solar - Calculator & Admin Lead Inbox Android App"
+description: "Sunward Solar - Calculator & Customer Leads Android App"
 publish_to: "none"
-version: 0.0.2+2
+version: 0.0.3+3
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
@@ -16,6 +16,7 @@ dependencies:
   http: ^1.2.2
   path_provider: ^2.1.4
   open_filex: ^4.5.0
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:
