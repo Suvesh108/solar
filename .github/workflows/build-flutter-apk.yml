@@ -43,14 +43,13 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Flutter project
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: solar_app
         run: |
           flutter analyze > /tmp/analyze.log 2>&1 || true
           cat /tmp/analyze.log
-          echo "### Flutter Analyze Output" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/analyze.log >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          gh release create debug-analyze /tmp/analyze.log --title "Analyze Log" --notes "Debug" || gh release upload debug-analyze /tmp/analyze.log --clobber
           if grep -q "error •" /tmp/analyze.log; then
             echo "Analyze found errors!"
             exit 1
