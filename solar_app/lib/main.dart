@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/lead.dart';
-import 'screens/admin_inbox_screen.dart';
 import 'screens/calculator_screen.dart';
+import 'screens/leads_screen.dart';
+import 'screens/profile_screen.dart';
 import 'services/lead_service.dart';
 import 'theme/app_theme.dart';
 
@@ -37,8 +39,95 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   final List<Widget> _screens = const [
     CalculatorScreen(),
-    AdminInboxScreen(),
+    LeadsScreen(),
+    ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstTimeOnboarding();
+    });
+  }
+
+  Future<void> _checkFirstTimeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString('user_name');
+    if (name == null || name.trim().isEmpty) {
+      if (!mounted) return;
+      _showOnboardingDialog();
+    }
+  }
+
+  void _showOnboardingDialog() {
+    final nameCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.asset('assets/logo.png', height: 32, width: 32),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Welcome to Sunward',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Aapka swagat hai! Please enter your name to personalize your app:',
+              style: TextStyle(fontSize: 13, color: AppColors.muted),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Your Name / Aapka Naam *',
+                hintText: 'e.g. Suvesh',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.ink,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                final input = nameCtrl.text.trim();
+                final finalName = input.isNotEmpty ? input : 'Solar Partner';
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('user_name', finalName);
+                if (mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Get Started / Shuru Karein', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,8 +146,8 @@ class _MainTabScreenState extends State<MainTabScreen> {
             onTap: (index) => setState(() => _currentIndex = index),
             items: [
               const BottomNavigationBarItem(
-                icon: Icon(Icons.solar_power_outlined),
-                activeIcon: Icon(Icons.solar_power),
+                icon: Icon(Icons.calculate_outlined),
+                activeIcon: Icon(Icons.calculate),
                 label: 'Calculator',
               ),
               BottomNavigationBarItem(
@@ -66,15 +155,20 @@ class _MainTabScreenState extends State<MainTabScreen> {
                   isLabelVisible: newLeadsCount > 0,
                   label: Text('$newLeadsCount'),
                   backgroundColor: AppColors.coral,
-                  child: const Icon(Icons.all_inbox_outlined),
+                  child: const Icon(Icons.people_alt_outlined),
                 ),
                 activeIcon: Badge(
                   isLabelVisible: newLeadsCount > 0,
                   label: Text('$newLeadsCount'),
                   backgroundColor: AppColors.coral,
-                  child: const Icon(Icons.all_inbox),
+                  child: const Icon(Icons.people_alt),
                 ),
-                label: 'Admin Box',
+                label: 'Leads',
+              ),
+              const BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline),
+                activeIcon: Icon(Icons.person),
+                label: 'Profile',
               ),
             ],
           );

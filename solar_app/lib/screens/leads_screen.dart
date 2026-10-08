@@ -5,14 +5,14 @@ import '../models/lead.dart';
 import '../services/lead_service.dart';
 import '../theme/app_theme.dart';
 
-class AdminInboxScreen extends StatefulWidget {
-  const AdminInboxScreen({super.key});
+class LeadsScreen extends StatefulWidget {
+  const LeadsScreen({super.key});
 
   @override
-  State<AdminInboxScreen> createState() => _AdminInboxScreenState();
+  State<LeadsScreen> createState() => _LeadsScreenState();
 }
 
-class _AdminInboxScreenState extends State<AdminInboxScreen> {
+class _LeadsScreenState extends State<LeadsScreen> {
   String _selectedFilter = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -81,7 +81,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
     final phoneCtrl = TextEditingController();
     final locationCtrl = TextEditingController();
     final billCtrl = TextEditingController();
-    String propType = 'House';
+    String propType = 'House / Ghar';
 
     showModalBottomSheet(
       context: context,
@@ -103,30 +103,30 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Add Manual Lead',
+                'Add Customer Lead / Naya Grahak',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.ink),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Customer Name *'),
+                decoration: const InputDecoration(labelText: 'Customer Name / Naam *'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'Phone Number *'),
+                decoration: const InputDecoration(labelText: 'Phone Number / Mobile *'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: locationCtrl,
-                decoration: const InputDecoration(labelText: 'Location / City *'),
+                decoration: const InputDecoration(labelText: 'Location / City / Shahar *'),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: billCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Monthly Bill (₹)'),
+                decoration: const InputDecoration(labelText: 'Monthly Bill / Bijli Bill (₹)'),
               ),
               const SizedBox(height: 20),
               SizedBox(
@@ -151,7 +151,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
                     if (mounted) Navigator.pop(ctx);
                   },
-                  child: const Text('Add Lead', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('Save Customer Lead', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -165,7 +165,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Lead Inbox Dashboard'),
+        title: const Text('Customer Leads'),
         actions: [
           IconButton(
             tooltip: 'Add Lead',
@@ -199,11 +199,11 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildTopMetric('Total Inquiries', '$totalCount', AppColors.white),
+                    _buildTopMetric('Total Leads', '$totalCount', AppColors.white),
                     Container(width: 1, height: 24, color: Colors.white24),
                     _buildTopMetric('New Pending', '$newCount', AppColors.sun),
                     Container(width: 1, height: 24, color: Colors.white24),
-                    _buildTopMetric('Won Deals', '$wonCount', AppColors.teal),
+                    _buildTopMetric('Deal Won', '$wonCount', AppColors.teal),
                   ],
                 ),
               ),

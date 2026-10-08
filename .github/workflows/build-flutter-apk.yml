@@ -5,9 +5,8 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'solar_app/**'
-      - '.github/workflows/build-flutter-apk.yml'
+    tags:
+      - 'v*'
 
 jobs:
   build-apk:
@@ -31,50 +30,35 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate standard Android project files
+      - name: Generate standard Android project & configure signing
         working-directory: solar_app
         run: |
           rm -rf android
           flutter create . --platforms=android --project-name=solar_app --org=com.sunward
-          python3 - << 'EOF'
-          import os
-
-          manifest_path = "android/app/src/main/AndroidManifest.xml"
-          with open(manifest_path, "r", encoding="utf-8") as f:
-              content = f.read()
-
-          permissions = """
-              <uses-permission android:name="android.permission.INTERNET"/>
-              <uses-permission android:name="android.permission.CALL_PHONE"/>
-              <queries>
-                  <intent>
-                      <action android:name="android.intent.action.DIAL"/>
-                      <data android:scheme="tel"/>
-                  </intent>
-                  <intent>
-                      <action android:name="android.intent.action.VIEW"/>
-                      <data android:scheme="https"/>
-                  </intent>
-              </queries>
-          """
-
-          if "<queries>" not in content:
-              content = content.replace("<application", permissions + "\n    <application")
-              with open(manifest_path, "w", encoding="utf-8") as f:
-                  f.write(content)
-          EOF
+          python3 scripts/setup_android.py
 
       - name: Install Flutter dependencies
         working-directory: solar_app
         run: flutter pub get
 
-      - name: Build Release APK
+      - name: Build Signed Release APK
         working-directory: solar_app
         run: flutter build apk --release
 
-      - name: Upload APK to Release v0.0.1
+      - name: Publish APK to GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp solar_app/build/app/outputs/flutter-apk/app-release.apk sunward-solar-flutter-v0.0.1.apk
-          gh release upload v0.0.1 sunward-solar-flutter-v0.0.1.apk --clobber
+          TAG_NAME="v0.0.2"
+          APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
+          OUT_APK="sunward-solar-flutter-${TAG_NAME}.apk"
+          cp "$APK_PATH" "$OUT_APK"
+          
+          # Ensure release exists or create it
+          if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release create "$TAG_NAME" \
+              --title "$TAG_NAME - Sunward Solar App Update" \
+              --notes "### Sunward Solar $TAG_NAME Updates`n`n- **Always Visible Custom Rates**: Solar panel rates, fitting/labour, and inverter/wiring fully customizable.`n- **Simplified Common Language**: Replaced confusing technical terms with clear, everyday words.`n- **Renamed to Leads**: Clean customer inquiry management pipeline.`n- **Profile & In-App Updater**: In-app one-click update checking and installation without browser downloads.`n- **Consistent Release Keystore**: Guaranteed signature compatibility across all app updates.`n- **New App Branding**: Official solar home & calculator app icon applied."
+          fi
+          
+          gh release upload "$TAG_NAME" "$OUT_APK" --clobber

@@ -38,8 +38,9 @@ npm run build
 ## 📱 Mobile App (`solar_app/`)
 
 Dedicated Flutter Android app featuring:
-- **Tab 1: Calculator** — Interactive solar sizing, payback calculation, and direct customer site visit intake.
-- **Tab 2: Admin Box** — Direct lead CRM with live pending badges, status switcher, one-tap phone dialer, and WhatsApp launcher.
+- **Tab 1: Calculator** — Solar sizing, customizable rates, payback calculation, and direct customer site visit intake.
+- **Tab 2: Leads** — Direct customer leads CRM with live pending badges, status switcher, one-tap phone dialer, and WhatsApp launcher.
+- **Tab 3: Profile** — User onboarding personalization and in-app 1-click update checker with background APK installation.
 
 To run:
 ```bash
