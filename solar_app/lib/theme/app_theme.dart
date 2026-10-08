@@ -5,6 +5,7 @@ class AppColors {
   static const Color muted = Color(0xFF5D7068);
   static const Color paper = Color(0xFFF6F4ED);
   static const Color cream = Color(0xFFEBE9DF);
+  static const Color creamDark = Color(0xFFDBD8CD);
   static const Color sun = Color(0xFFF4B942);
   static const Color coral = Color(0xFFE9785D);
   static const Color teal = Color(0xFF2B6E68);

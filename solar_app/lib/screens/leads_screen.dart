@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/lead.dart';
 import '../services/language_service.dart';
 import '../services/lead_service.dart';
+import '../services/quote_share_service.dart';
 import '../theme/app_theme.dart';
 
 class LeadsScreen extends StatefulWidget {
