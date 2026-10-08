@@ -39,16 +39,11 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Android & Gradle
-.gradle/
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
+# Binaries
 *.apk
 *.aab
 
-# Flutter
+# Flutter (solar_app)
 solar_app/.dart_tool/
 solar_app/build/
 solar_app/.flutter-plugins

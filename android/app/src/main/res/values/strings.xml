@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Sunward Solar</string>
-    <string name="title_activity_main">Sunward Solar</string>
-    <string name="package_name">com.sunward.solar</string>
-    <string name="custom_url_scheme">com.sunward.solar</string>
-</resources>
