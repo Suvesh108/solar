@@ -27,7 +27,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   void dispose() {
-    _billController.dispose;
+    _billController.dispose();
     _kwController.dispose();
     _tariffController.dispose();
     _costPerKwController.dispose();
