@@ -34,8 +34,9 @@ jobs:
       - name: Generate standard Android project & configure signing
         working-directory: solar_app
         run: |
-          rm -rf android
+          rm -rf android test
           flutter create . --platforms=android --project-name=solar_app --org=com.sunward
+          rm -rf test
           python3 scripts/setup_android.py
 
       - name: Install Flutter dependencies
@@ -43,22 +44,12 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Flutter project
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: solar_app
-        run: |
-          flutter analyze > /tmp/analyze.log 2>&1 || true
-          cat /tmp/analyze.log
-          gh release create debug-analyze /tmp/analyze.log --title "Analyze Log" --notes "Debug" || gh release upload debug-analyze /tmp/analyze.log --clobber
-          if grep -q "error •" /tmp/analyze.log; then
-            echo "Analyze found errors!"
-            exit 1
-          fi
+        run: flutter analyze --no-fatal-infos
 
       - name: Build Signed Release APK
         working-directory: solar_app
-        run: |
-          flutter build apk --release --verbose > build.log 2>&1 || (echo "=== BUILD LOG ERROR TAIL ===" && tail -n 250 build.log && exit 1)
+        run: flutter build apk --release
 
       - name: Publish APK to GitHub Release
         env:

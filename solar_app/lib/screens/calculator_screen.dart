@@ -669,20 +669,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildReceiptMiniStat(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.white60, fontSize: 10)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final lang = LanguageService.instance;
