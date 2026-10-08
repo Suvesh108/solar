@@ -20,7 +20,7 @@ Dedicated Android mobile application for **Sunward Solar**, containing only the 
    - Lead Capture: Book Free Site Survey button saves directly to the local Lead CRM and forwards to the Admin Box.
 
 2. **Admin Lead Box & CRM (Tab 2)**:
-   - Password-protected authentication (`sunward123`).
+   - Direct access to leads pipeline and CRM.
    - Summary statistics bar (Total inquiries, New pending, Won deals).
    - Instant search by customer name, phone, or location.
    - Status filter chips (All, New, Contacted, Qualified, Site Visit, Quotation, Won, Lost).

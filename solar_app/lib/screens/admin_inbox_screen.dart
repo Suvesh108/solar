@@ -13,9 +13,6 @@ class AdminInboxScreen extends StatefulWidget {
 }
 
 class _AdminInboxScreenState extends State<AdminInboxScreen> {
-  static const String _adminPassword = 'sunward123';
-  bool _isAuthenticated = false;
-  final _passwordController = TextEditingController();
   String _selectedFilter = 'All';
   String _searchQuery = '';
   final _searchController = TextEditingController();
@@ -24,24 +21,8 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   @override
   void dispose() {
-    _passwordController.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _login() {
-    if (_passwordController.text == _adminPassword) {
-      setState(() {
-        _isAuthenticated = true;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.coral,
-          content: Text('Invalid password. Default is sunward123'),
-        ),
-      );
-    }
   }
 
   Color _getStatusColor(LeadStatus status) {
@@ -182,73 +163,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isAuthenticated) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Sunward Admin Box'),
-        ),
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: AppColors.cream,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.lock_outline, size: 36, color: AppColors.ink),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Admin Login',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.ink),
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Enter password to access customer lead inquiries and status manager.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        hintText: 'sunward123',
-                        prefixIcon: Icon(Icons.key),
-                      ),
-                      onSubmitted: (_) => _login(),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.ink,
-                          foregroundColor: AppColors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                        onPressed: _login,
-                        child: const Text('Unlock Inbox', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lead Inbox Dashboard'),
@@ -257,11 +171,6 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
             tooltip: 'Add Lead',
             icon: const Icon(Icons.person_add_alt_1),
             onPressed: () => _showAddLeadModal(context),
-          ),
-          IconButton(
-            tooltip: 'Lock Inbox',
-            icon: const Icon(Icons.logout),
-            onPressed: () => setState(() => _isAuthenticated = false),
           ),
         ],
       ),
@@ -478,7 +387,7 @@ class _AdminInboxScreenState extends State<AdminInboxScreen> {
                                       Expanded(
                                         child: ElevatedButton.icon(
                                           style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF25D366), // WhatsApp Brand Green
+                                            backgroundColor: const Color(0xFF25D366),
                                             foregroundColor: Colors.white,
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                                             padding: const EdgeInsets.symmetric(vertical: 8),

@@ -1,59 +1,20 @@
-﻿import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Lead, LeadStatus, readLeads, updateLead } from "@/lib/leads";
 
-const ADMIN_PASSWORD = "sunward123";
 const statuses: LeadStatus[] = ["New", "Contacted", "Qualified", "Site Visit", "Quotation", "Won", "Lost"];
 
 export default function AdminInbox() {
-  const [authenticated, setAuthenticated] = useState(false);
-  const [password, setPassword] = useState("");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    setAuthenticated(sessionStorage.getItem("sunward-admin") === "true");
     setLeads(readLeads());
   }, []);
-
-  function login(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (password === ADMIN_PASSWORD) {
-      sessionStorage.setItem("sunward-admin", "true");
-      setAuthenticated(true);
-    }
-  }
 
   function changeStatus(id: string, status: LeadStatus) {
     updateLead(id, { status });
     setLeads(readLeads());
-  }
-
-  if (!authenticated) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[var(--ink)] px-6">
-        <form onSubmit={login} className="w-full max-w-sm bg-[var(--paper)] p-8">
-          <p className="text-xs font-bold uppercase tracking-[.2em] text-[var(--coral)]">Sunward admin</p>
-          <h1 className="display mt-4 text-4xl">Lead inbox</h1>
-          <p className="mt-3 text-sm leading-6 text-[var(--muted)]">Admin login karein aur customer queries dekhein.</p>
-          <label className="mt-8 block text-xs font-bold uppercase tracking-[.12em]">
-            Password
-            <input
-              autoFocus
-              required
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="input-field mt-2"
-            />
-          </label>
-          <button type="submit" className="mt-5 w-full bg-[var(--ink)] px-5 py-3 text-sm font-bold text-white">
-            Open inbox ↗
-          </button>
-          <p className="mt-4 text-xs text-[var(--muted)]">Default password: sunward123</p>
-        </form>
-      </main>
-    );
   }
 
   const visibleLeads = leads.filter(
@@ -71,16 +32,6 @@ export default function AdminInbox() {
               ☼ sunward <span className="ml-2 text-sm font-normal text-white/50">admin inbox</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              sessionStorage.removeItem("sunward-admin");
-              setAuthenticated(false);
-            }}
-            className="text-sm text-white/70 hover:text-white"
-          >
-            Log out
-          </button>
         </div>
       </header>
 

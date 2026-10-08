@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sunward Solar
 
-## Getting Started
+Solar rooftop lead generation platform & mobile application suite.
 
-First, run the development server:
+## 🌟 Overview
+
+- **Web Application (`/src`)**: High-performance React 19 + Vite SPA built with Tailwind CSS v4, Motion, and local lead management.
+- **Android App (`/solar_app`)**: Standalone Flutter application focused purely on the **Solar ROI Calculator** and **Admin Lead Box**.
+
+---
+
+## ⚡ Web Platform
+
+### Getting Started
 
 ```bash
+# Install dependencies
+npm install
+
+# Start local dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Build for production
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Pages & Routes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/` — Homepage with direct consultation CTA, WhatsApp & phone integration.
+- `/why-solar` — Educational rooftop solar guide, net metering & subsidy overview.
+- `/projects` — Real installations & project portfolio.
+- `/calculator` — Interactive solar ROI, capacity, payback & subsidy calculator.
+- `/contact` — Lead capture form with direct persistent lead routing.
+- `/admin/inbox` — Direct administrative lead inbox & CRM pipeline.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 📱 Mobile App (`solar_app/`)
 
-To learn more about Next.js, take a look at the following resources:
+Dedicated Flutter Android app featuring:
+- **Tab 1: Calculator** — Interactive solar sizing, payback calculation, and direct customer site visit intake.
+- **Tab 2: Admin Box** — Direct lead CRM with live pending badges, status switcher, one-tap phone dialer, and WhatsApp launcher.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+To run:
+```bash
+cd solar_app
+flutter pub get
+flutter run
+```
