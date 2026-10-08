@@ -5,8 +5,9 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
+    paths:
+      - 'solar_app/**'
+      - '.github/workflows/build-flutter-apk.yml'
 
 jobs:
   build-apk:
@@ -53,12 +54,4 @@ jobs:
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK="sunward-solar-flutter-${TAG_NAME}.apk"
           cp "$APK_PATH" "$OUT_APK"
-          
-          # Ensure release exists or create it
-          if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release create "$TAG_NAME" \
-              --title "$TAG_NAME - Sunward Solar App Update" \
-              --notes "### Sunward Solar $TAG_NAME Updates`n`n- **Always Visible Custom Rates**: Solar panel rates, fitting/labour, and inverter/wiring fully customizable.`n- **Simplified Common Language**: Replaced confusing technical terms with clear, everyday words.`n- **Renamed to Leads**: Clean customer inquiry management pipeline.`n- **Profile & In-App Updater**: In-app one-click update checking and installation without browser downloads.`n- **Consistent Release Keystore**: Guaranteed signature compatibility across all app updates.`n- **New App Branding**: Official solar home & calculator app icon applied."
-          fi
-          
           gh release upload "$TAG_NAME" "$OUT_APK" --clobber
