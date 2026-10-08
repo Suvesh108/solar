@@ -19,49 +19,112 @@ class UpdateInfo {
   });
 }
 
-class UpdateService {
-  static const String currentVersion = 'v0.0.3';
-  static const String _repoReleasesUrl = 'https://api.github.com/repos/Suvesh108/solar/releases/latest';
+enum UpdateCheckStatus {
+  updateAvailable,
+  upToDate,
+  error,
+}
 
-  static Future<UpdateInfo?> checkForUpdate() async {
+class UpdateCheckResult {
+  final UpdateCheckStatus status;
+  final UpdateInfo? update;
+  final String currentVersion;
+  final String? latestVersion;
+  final String? errorMessage;
+
+  UpdateCheckResult({
+    required this.status,
+    this.update,
+    required this.currentVersion,
+    this.latestVersion,
+    this.errorMessage,
+  });
+}
+
+class UpdateService {
+  static const String currentVersion = 'v0.0.4';
+  static const String _releasesListUrl = 'https://api.github.com/repos/Suvesh108/solar/releases';
+
+  static Future<UpdateCheckResult> checkForUpdate() async {
     try {
       final response = await http.get(
-        Uri.parse(_repoReleasesUrl),
-        headers: {'Accept': 'application/vnd.github.v3+json'},
-      );
+        Uri.parse(_releasesListUrl),
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'SunwardSolarApp/$currentVersion',
+        },
+      ).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final latestTag = (data['tag_name'] as String? ?? '').trim();
-        final body = data['body'] as String? ?? 'New version available with improvements.';
-        final assets = data['assets'] as List<dynamic>? ?? [];
+        final data = jsonDecode(response.body);
+        if (data is List && data.isNotEmpty) {
+          // GitHub returns releases array ordered descending by date; data[0] is latest
+          for (final item in data) {
+            final release = item as Map<String, dynamic>;
+            final isDraft = release['draft'] as bool? ?? false;
+            final isPrerelease = release['prerelease'] as bool? ?? false;
+            if (isDraft || isPrerelease) continue;
 
-        String apkUrl = '';
-        int apkSize = 0;
+            final latestTag = (release['tag_name'] as String? ?? '').trim();
+            final body = release['body'] as String? ?? 'New version available with improvements.';
+            final assets = release['assets'] as List<dynamic>? ?? [];
 
-        for (final asset in assets) {
-          final name = (asset['name'] as String? ?? '').toLowerCase();
-          if (name.endsWith('.apk')) {
-            apkUrl = asset['browser_download_url'] as String? ?? '';
-            apkSize = asset['size'] as int? ?? 0;
-            break;
+            String apkUrl = '';
+            int apkSize = 0;
+
+            for (final asset in assets) {
+              final name = (asset['name'] as String? ?? '').toLowerCase();
+              if (name.endsWith('.apk')) {
+                apkUrl = asset['browser_download_url'] as String? ?? '';
+                apkSize = asset['size'] as int? ?? 0;
+                break;
+              }
+            }
+
+            if (latestTag.isNotEmpty) {
+              final isNewer = _isNewerVersion(latestTag, currentVersion);
+              if (isNewer && apkUrl.isNotEmpty) {
+                return UpdateCheckResult(
+                  status: UpdateCheckStatus.updateAvailable,
+                  update: UpdateInfo(
+                    version: latestTag,
+                    notes: body,
+                    apkUrl: apkUrl,
+                    apkSize: apkSize,
+                  ),
+                  currentVersion: currentVersion,
+                  latestVersion: latestTag,
+                );
+              } else {
+                return UpdateCheckResult(
+                  status: UpdateCheckStatus.upToDate,
+                  currentVersion: currentVersion,
+                  latestVersion: latestTag,
+                );
+              }
+            }
           }
         }
 
-        // Compare versions (e.g. v0.0.3 vs v0.0.2)
-        if (_isNewerVersion(latestTag, currentVersion) && apkUrl.isNotEmpty) {
-          return UpdateInfo(
-            version: latestTag,
-            notes: body,
-            apkUrl: apkUrl,
-            apkSize: apkSize,
-          );
-        }
+        return UpdateCheckResult(
+          status: UpdateCheckStatus.upToDate,
+          currentVersion: currentVersion,
+        );
+      } else {
+        return UpdateCheckResult(
+          status: UpdateCheckStatus.error,
+          currentVersion: currentVersion,
+          errorMessage: 'Server returned HTTP ${response.statusCode}',
+        );
       }
     } catch (e) {
       debugPrint('Error checking for update: $e');
+      return UpdateCheckResult(
+        status: UpdateCheckStatus.error,
+        currentVersion: currentVersion,
+        errorMessage: e.toString(),
+      );
     }
-    return null;
   }
 
   static bool _isNewerVersion(String latest, String current) {
@@ -87,8 +150,12 @@ class UpdateService {
     required void Function(double progress) onProgress,
   }) async {
     try {
+      final client = http.Client();
       final request = http.Request('GET', Uri.parse(apkUrl));
-      final response = await http.Client().send(request);
+      request.headers['User-Agent'] = 'SunwardSolarApp/$currentVersion';
+      request.followRedirects = true;
+
+      final response = await client.send(request);
 
       if (response.statusCode != 200) return null;
 
@@ -114,7 +181,7 @@ class UpdateService {
       await sink.flush();
       await sink.close();
 
-      // Launch in-place native package installer without browser redirection
+      // Launch native package installer directly
       await OpenFilex.open(
         apkFile.path,
         type: 'application/vnd.android.package-archive',

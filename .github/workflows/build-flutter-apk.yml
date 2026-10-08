@@ -50,12 +50,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v0.0.3"
+          TAG_NAME="v0.0.4"
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK="sunward-solar-flutter-${TAG_NAME}.apk"
           cp "$APK_PATH" "$OUT_APK"
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
             gh release upload "$TAG_NAME" "$OUT_APK" --clobber
           else
-            gh release create "$TAG_NAME" "$OUT_APK" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME with Bilingual Hindi/English, Solar Plates Calculator, Updated Subsidy, Motion/Animations, and WhatsApp Quote Sharing"
+            gh release create "$TAG_NAME" "$OUT_APK" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME with Update Checker Fix, Bank Loan & EMI Box, Custom Property Type Dropdown, and Direct WhatsApp Chat Deep Linking"
           fi

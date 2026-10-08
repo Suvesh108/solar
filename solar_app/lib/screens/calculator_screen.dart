@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/language_service.dart';
@@ -24,7 +25,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   final _extraCostController = TextEditingController(text: '15000');  // Inverter & Wiring
   final _subsidyController = TextEditingController(text: '98000');   // Govt Subsidy
 
-  String _propertyType = 'House / Ghar';
+  // Bank Loan & EMI Settings
+  final _loanAmountController = TextEditingController(text: '0');
+  final _interestRateController = TextEditingController(text: '8.5'); // 8.5% p.a.
+  final _loanTenureController = TextEditingController(text: '5');      // 5 years
+
+  String _propertyType = 'Residential';
   final GlobalKey _quotationBoundaryKey = GlobalKey();
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
@@ -49,6 +55,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     _installRateController.dispose();
     _extraCostController.dispose();
     _subsidyController.dispose();
+    _loanAmountController.dispose();
+    _interestRateController.dispose();
+    _loanTenureController.dispose();
     super.dispose();
   }
 
@@ -64,13 +73,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   double get _extraCost => double.tryParse(_extraCostController.text) ?? 15000;
   double get _subsidy => double.tryParse(_subsidyController.text) ?? 0;
 
+  double get _loanAmount => double.tryParse(_loanAmountController.text) ?? 0;
+  double get _interestRate => double.tryParse(_interestRateController.text) ?? 8.5;
+  int get _loanTenureYears {
+    final y = int.tryParse(_loanTenureController.text) ?? 5;
+    return y > 0 ? y : 1;
+  }
+
+  double _calculateMonthlyEmi(double principal, double annualRate, int years) {
+    if (principal <= 0 || years <= 0) return 0.0;
+    if (annualRate <= 0) return principal / (years * 12);
+    final monthlyRate = annualRate / (12 * 100);
+    final months = years * 12;
+    final factor = math.pow(1 + monthlyRate, months);
+    return (principal * monthlyRate * factor) / (factor - 1);
+  }
+
   double _computeSubsidyFor(double kw, String propType) {
-    final isResidential = propType.toLowerCase().contains('house') ||
-        propType.toLowerCase().contains('ghar') ||
-        propType.toLowerCase().contains('residential');
-    
-    // Commercial, Corporate & Industrial get NO subsidy (₹0)
-    if (!isResidential || kw <= 0) {
+    // Only Residential qualifies for PM Surya Ghar subsidy
+    if (propType != 'Residential' || kw <= 0) {
       return 0.0;
     }
 
@@ -174,6 +195,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     final annualSavings = monthlySavings * 12;
     final payback = annualSavings > 0 ? (netPayable / annualSavings).toStringAsFixed(1) : '0';
     final profit25 = (annualSavings * 25) - netPayable;
+
+    final loanAmt = _loanAmount;
+    final rate = _interestRate;
+    final years = _loanTenureYears;
+    final emi = _calculateMonthlyEmi(loanAmt, rate, years);
+    final downPayment = (netPayable - loanAmt) > 0 ? (netPayable - loanAmt) : 0.0;
 
     showModalBottomSheet(
       context: context,
@@ -295,6 +322,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           ),
                         ],
                       ),
+                      if (loanAmt > 0) ...[
+                        const Divider(color: Colors.white24, height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildReceiptMiniStat('Bank Loan', _currencyFormat.format(loanAmt)),
+                            _buildReceiptMiniStat('Monthly EMI', '${_currencyFormat.format(emi)}/mo'),
+                            _buildReceiptMiniStat('Down Payment', _currencyFormat.format(downPayment)),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -383,6 +421,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                     annualSavings: annualSavings,
                     paybackYears: payback,
                     profit25Years: profit25,
+                    loanAmount: loanAmt > 0 ? loanAmt : null,
+                    emiAmount: loanAmt > 0 ? emi : null,
+                    loanYears: loanAmt > 0 ? years : null,
                   );
 
                   if (mounted) Navigator.pop(ctx);
@@ -429,6 +470,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                     annualSavings: annualSavings,
                     paybackYears: payback,
                     profit25Years: profit25,
+                    loanAmount: loanAmt > 0 ? loanAmt : null,
+                    emiAmount: loanAmt > 0 ? emi : null,
+                    loanYears: loanAmt > 0 ? years : null,
                   );
 
                   await QuoteShareService.shareQuotationImage(
@@ -661,37 +705,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 12),
 
-                        // Property Type Dropdown
-                        Text(
-                          lang.t('Property Type (Subsidy applies to Residential)', 'जगह का प्रकार (सब्सिडी सिर्फ घर के लिए है)'),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 6),
-                        DropdownButtonFormField<String>(
-                          value: _propertyType,
-                          decoration: const InputDecoration(),
-                          items: [
-                            DropdownMenuItem(
-                              value: 'House / Ghar',
-                              child: Text(lang.t('House / Ghar (Residential — Up to ₹98k Subsidy)', 'घर (Residential — ₹98,000 तक सब्सिडी)')),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Shop / Dukaan',
-                              child: Text(lang.t('Shop / Commercial Dukaan (No Subsidy)', 'दुकान (Commercial — कोई सब्सिडी नहीं)')),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Office',
-                              child: Text(lang.t('Office / Corporate (No Subsidy)', 'ऑफिस (Corporate — कोई सब्सिडी नहीं)')),
-                            ),
-                            DropdownMenuItem(
-                              value: 'Factory',
-                              child: Text(lang.t('Factory / Industrial (No Subsidy)', 'फैक्ट्री (Industrial — कोई सब्सिडी नहीं)')),
-                            ),
-                          ],
-                          onChanged: _onPropertyTypeChanged,
-                        ),
+                        // Property Type Dropdown (Custom UI showing only Residential, Commercial, Corporate, Industrial)
+                        _buildPropertyTypeSelector(lang),
                       ],
                     ),
                   ),
@@ -812,9 +827,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: lang.t('Govt Subsidy Discount (₹)', 'सरकारी सब्सिडी छूट (₹)'),
-                            helperText: _propertyType.toLowerCase().contains('house') || _propertyType.toLowerCase().contains('ghar')
+                            helperText: _propertyType == 'Residential'
                                 ? lang.t('PM Surya Ghar: 1kW=₹40k, 2kW=₹80k, 3kW+=₹98k', 'पीएम सूर्य घर: 1kW=₹40k, 2kW=₹80k, 3kW+=₹98k')
-                                : lang.t('Commercial/Industrial has no subsidy (₹0)', 'कमर्शियल/फैक्ट्री पर कोई सब्सिडी नहीं (₹0)'),
+                                : lang.t('Commercial/Corporate/Industrial has no subsidy (₹0)', 'कमर्शियल/कॉर्पोरेट/फैक्ट्री पर कोई सब्सिडी नहीं (₹0)'),
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -824,7 +839,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 ),
                 const SizedBox(height: 14),
 
-                // STEP 3: Enhanced Solar Estimate Box (Animated with common words)
+                // STEP 3: Solar Bank Loan & Easy EMI Card
+                _buildBankLoanCard(lang, finalPriceYouPay, monthlySavings),
+                const SizedBox(height: 14),
+
+                // STEP 4: Enhanced Solar Estimate Box (Animated with common words)
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0.95, end: 1.0),
                   duration: const Duration(milliseconds: 300),
@@ -857,7 +876,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    lang.t('TOTAL CALCULATION ESTIMATE', 'आपका पूरा हिसाब-किताब'),
+                                    lang.t('4. TOTAL CALCULATION ESTIMATE', '4. आपका पूरा हिसाब-किताब'),
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
@@ -992,6 +1011,75 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             ],
                           ),
                         ),
+                        if (_loanAmount > 0) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.white.withOpacity(0.55),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      lang.t('BANK LOAN & EMI (KIST HISAAB)', 'बैंक लोन व किश्त का हिसाब'),
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                    ),
+                                    Text(
+                                      '$_loanTenureYears ${lang.t("Yrs @", "साल @")} $_interestRate%',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.teal),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                _buildPriceRow(lang.t('Sanctioned Loan', 'स्वीकृत लोन रकम'), _currencyFormat.format(_loanAmount)),
+                                _buildPriceRow(
+                                  lang.t('Down Payment (Cash)', 'डाउन पेमेंट (नकद भुगतान)'),
+                                  _currencyFormat.format((finalPriceYouPay - _loanAmount) > 0 ? (finalPriceYouPay - _loanAmount) : 0),
+                                ),
+                                _buildPriceRow(
+                                  lang.t('Monthly EMI', 'हर महीने की किश्त (EMI)'),
+                                  '${_currencyFormat.format(_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears))} / ${lang.t("mo", "महीना")}',
+                                ),
+                                _buildPriceRow(
+                                  lang.t('Total Bank Interest', 'कुल बैंक ब्याज'),
+                                  _currencyFormat.format(
+                                    ((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount) > 0
+                                        ? ((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount)
+                                        : 0,
+                                  ),
+                                ),
+                                const Divider(height: 12, thickness: 1, color: AppColors.ink),
+                                _buildPriceRow(
+                                  lang.t('Total Cost with Loan Interest', 'ब्याज सहित कुल खर्च'),
+                                  _currencyFormat.format(
+                                    finalPriceYouPay +
+                                        (((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount) > 0
+                                            ? ((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount)
+                                            : 0),
+                                  ),
+                                  isBold: true,
+                                ),
+                                _buildPriceRow(
+                                  lang.t('Net 25-Year Profit (after Loan)', '25 साल का शुद्ध मुनाफा'),
+                                  _currencyFormat.format(
+                                    (annualSavings * 25) -
+                                        (finalPriceYouPay +
+                                            (((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount) > 0
+                                                ? ((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount)
+                                                : 0)),
+                                  ),
+                                  isBold: true,
+                                  isGreen: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 12),
 
                         // Electricity & Rooftop Specs
@@ -1126,6 +1214,437 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
           overflow: TextOverflow.ellipsis,
         ),
       ],
+    );
+  }
+
+  Widget _buildPropertyTypeSelector(LanguageService lang) {
+    final types = [
+      {'key': 'Residential', 'en': 'Residential', 'hi': 'Residential (आवासीय)', 'icon': Icons.home_outlined},
+      {'key': 'Commercial', 'en': 'Commercial', 'hi': 'Commercial (व्यावसायिक)', 'icon': Icons.storefront_outlined},
+      {'key': 'Corporate', 'en': 'Corporate', 'hi': 'Corporate (कॉर्पोरेट)', 'icon': Icons.business_outlined},
+      {'key': 'Industrial', 'en': 'Industrial', 'hi': 'Industrial (औद्योगिक)', 'icon': Icons.factory_outlined},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              lang.t('Property Type', 'जगह का प्रकार'),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: _propertyType == 'Residential' ? AppColors.teal.withOpacity(0.12) : AppColors.muted.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                _propertyType == 'Residential'
+                    ? lang.t('Subsidy Eligible', 'सब्सिडी लागू')
+                    : lang.t('No Subsidy', 'सब्सिडी नहीं'),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: _propertyType == 'Residential' ? AppColors.teal : AppColors.muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.paper,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.creamDark, width: 1.2),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _propertyType,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.ink),
+              items: types.map((item) {
+                final key = item['key'] as String;
+                final label = lang.isHindi ? (item['hi'] as String) : (item['en'] as String);
+                final icon = item['icon'] as IconData;
+                return DropdownMenuItem<String>(
+                  value: key,
+                  child: Row(
+                    children: [
+                      Icon(icon, size: 18, color: AppColors.teal),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: _onPropertyTypeChanged,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBankLoanCard(
+    LanguageService lang,
+    double netPayable,
+    double monthlySavings,
+  ) {
+    final loanAmt = _loanAmount;
+    final rate = _interestRate;
+    final years = _loanTenureYears;
+    final emi = _calculateMonthlyEmi(loanAmt, rate, years);
+    final totalMonths = years * 12;
+    final totalRepayment = emi * totalMonths;
+    final totalInterest = totalRepayment > loanAmt ? totalRepayment - loanAmt : 0.0;
+    final downPayment = (netPayable - loanAmt) > 0 ? (netPayable - loanAmt) : 0.0;
+    final netMonthlyCashflow = monthlySavings - emi;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.account_balance_outlined, size: 18, color: AppColors.teal),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    lang.t('3. BANK LOAN & EASY EMI (FINANCE)', '3. सोलर बैंक लोन व आसान किश्त (EMI)'),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.1,
+                      color: AppColors.teal,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              lang.t(
+                'Calculate solar loan EMI and monthly savings (SBI/Govt loan ~7% to 8.5% p.a.):',
+                'सोलर बैंक लोन व मासिक किश्त का हिसाब निकालें (पीएम सूर्य घर लोन ~7% से 8.5%):',
+              ),
+              style: const TextStyle(fontSize: 11, color: AppColors.muted),
+            ),
+            const SizedBox(height: 12),
+
+            // Loan Amount Input + Quick Presets
+            Text(
+              lang.t('Loan Amount (₹)', 'लोन राशि (₹)'),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _loanAmountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                prefixText: '₹ ',
+                prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+                helperText: loanAmt > 0
+                    ? lang.t(
+                        'Down payment: ${_currencyFormat.format(downPayment)}',
+                        'डाउन पेमेंट (शुरुआती रकम): ${_currencyFormat.format(downPayment)}',
+                      )
+                    : lang.t('Enter 0 for cash payment', 'नकद भुगतान के लिए 0 रखें'),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+
+            // Quick Loan Amount Presets
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  Text(
+                    '${lang.t("Quick Amount", "शॉर्टकट")}: ',
+                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  ),
+                  ChoiceChip(
+                    label: Text(lang.t('100% Loan', 'पूरा लोन')),
+                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    selected: (loanAmt - netPayable).abs() < 10 && loanAmt > 0,
+                    selectedColor: AppColors.sun,
+                    backgroundColor: AppColors.cream,
+                    showCheckmark: false,
+                    onSelected: (_) {
+                      setState(() {
+                        _loanAmountController.text = netPayable.round().toString();
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: Text(lang.t('80% Loan', '80% लोन')),
+                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    selected: (loanAmt - (netPayable * 0.8)).abs() < 50 && loanAmt > 0,
+                    selectedColor: AppColors.sun,
+                    backgroundColor: AppColors.cream,
+                    showCheckmark: false,
+                    onSelected: (_) {
+                      setState(() {
+                        _loanAmountController.text = (netPayable * 0.8).round().toString();
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: Text(lang.t('50% Loan', '50% लोन')),
+                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    selected: (loanAmt - (netPayable * 0.5)).abs() < 50 && loanAmt > 0,
+                    selectedColor: AppColors.sun,
+                    backgroundColor: AppColors.cream,
+                    showCheckmark: false,
+                    onSelected: (_) {
+                      setState(() {
+                        _loanAmountController.text = (netPayable * 0.5).round().toString();
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: Text(lang.t('No Loan (Cash)', 'कोई लोन नहीं')),
+                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    selected: loanAmt <= 0,
+                    selectedColor: AppColors.coral,
+                    backgroundColor: AppColors.cream,
+                    showCheckmark: false,
+                    onSelected: (_) {
+                      setState(() {
+                        _loanAmountController.text = '0';
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Interest Rate & Tenure Row
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lang.t('Interest Rate (% p.a.)', 'ब्याज दर (% सालाना)'),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _interestRateController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          suffixText: '%',
+                          suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        lang.t('Tenure (Years)', 'अवधि (साल)'),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _loanTenureController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          suffixText: lang.t('Yrs', 'साल'),
+                          suffixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Quick Chips for Interest Rate & Tenure
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: [
+                  Text(
+                    '${lang.t("Tenure", "साल")}: ',
+                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  ),
+                  for (final yr in [3, 5, 7, 10]) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text('$yr ${lang.t("Yrs", "साल")}'),
+                        labelStyle: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: years == yr ? AppColors.ink : AppColors.muted,
+                        ),
+                        selected: years == yr,
+                        selectedColor: AppColors.sun,
+                        backgroundColor: AppColors.cream,
+                        showCheckmark: false,
+                        onSelected: (_) {
+                          setState(() {
+                            _loanTenureController.text = yr.toString();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            if (loanAmt > 0) ...[
+              const SizedBox(height: 14),
+              // Live EMI Calculation Result Card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.cream,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.teal.withOpacity(0.3), width: 1.2),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lang.t('MONTHLY EMI (किश्त)', 'महीने की किश्त (EMI)'),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '${_currencyFormat.format(emi)} / ${lang.t("mo", "महीना")}',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.teal,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(width: 1, height: 36, color: AppColors.ink.withOpacity(0.15)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lang.t('TOTAL INTEREST', 'कुल ब्याज'),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.8,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  _currencyFormat.format(totalInterest),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 16),
+                    // Monthly cashflow comparison callout
+                    Row(
+                      children: [
+                        Icon(
+                          netMonthlyCashflow >= 0 ? Icons.check_circle_outline : Icons.info_outline,
+                          size: 16,
+                          color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.muted,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            netMonthlyCashflow >= 0
+                                ? lang.t(
+                                    'Free Solar! Bijli savings (₹${monthlySavings.round()}) cover EMI with +₹${netMonthlyCashflow.round()} extra cash in hand!',
+                                    'सोलर फ्री में! बिजली बचत (₹${monthlySavings.round()}) किश्त चुका देगी और महीने में +₹${netMonthlyCashflow.round()} बचेंगे!',
+                                  )
+                                : lang.t(
+                                    'Effective cost is only ₹${(-netMonthlyCashflow).round()}/mo (EMI ₹${emi.round()} - Saved ₹${monthlySavings.round()}) for $years yrs.',
+                                    'असल खर्च सिर्फ ₹${(-netMonthlyCashflow).round()}/माह (किश्त ₹${emi.round()} - बचत ₹${monthlySavings.round()}) $years साल तक।',
+                                  ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.ink,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

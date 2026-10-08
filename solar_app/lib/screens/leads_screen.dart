@@ -60,20 +60,23 @@ class _LeadsScreenState extends State<LeadsScreen> {
   }
 
   Future<void> _openWhatsApp(String phone, String name) async {
-    var clean = phone.replaceAll(RegExp(r'\D'), '');
-    if (clean.length == 10) {
-      clean = '91$clean';
-    }
-    final message = "Namaste $name ji, I'm reaching out from Sunward Solar regarding your rooftop inquiry.";
-    final uri = Uri.parse('https://wa.me/$clean?text=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open WhatsApp')),
-        );
-      }
+    final lang = LanguageService.instance;
+    final message = "Namaste $name ji, I'm reaching out from Sunward Solar regarding your solar rooftop inquiry.";
+    final ok = await QuoteShareService.openWhatsApp(
+      phone: phone,
+      message: message,
+    );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            lang.t(
+              'Could not open WhatsApp. Please check if WhatsApp is installed.',
+              'व्हाट्सऐप नहीं खुल सका। कृपया जांचें कि व्हाट्सऐप इंस्टॉल है या नहीं।',
+            ),
+          ),
+        ),
+      );
     }
   }
 

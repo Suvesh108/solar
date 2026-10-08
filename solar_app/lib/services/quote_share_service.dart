@@ -25,7 +25,22 @@ class QuoteShareService {
     required double annualSavings,
     required String paybackYears,
     required double profit25Years,
+    double? loanAmount,
+    double? emiAmount,
+    int? loanYears,
   }) {
+    final hasLoan = (loanAmount != null && loanAmount > 0 && emiAmount != null && emiAmount > 0);
+
+    final loanSection = hasLoan
+        ? '''
+🏦 *BANK LOAN & EASY EMI (किश्त योजना):*
+• Sanctioned Loan: ₹${loanAmount.round()} ($loanYears Saal / Years)
+• Monthly EMI (किश्त): ₹${emiAmount.round()} / month
+• Monthly Bijli Saved: ₹${monthlySavings.round()} / month
+${monthlySavings >= emiAmount ? '★ *Cash Profit from Day 1:* +₹${(monthlySavings - emiAmount).round()} / month!' : '★ *Net Out-of-pocket:* ₹${(emiAmount - monthlySavings).round()} / month (Free thereafter!)'}
+'''
+        : '';
+
     return '''
 ☀️ *SUNWARD SOLAR — OFFICIAL ROOFTOP QUOTE* ☀️
 ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -49,7 +64,7 @@ class QuoteShareService {
 • *Kul Kharcha (Total Price):* ₹${totalSystemCost.round()}
 • *Govt Subsidy Discount:* -₹${subsidy.round()}
 ★ *FINAL AMOUNT TO PAY:* ₹${netPayable.round()}*
-
+$loanSection
 📈 *SAVINGS & PROFIT:*
 • Monthly Bill Saved: ~₹${monthlySavings.round()} / month
 • Annual Bill Saved: ~₹${annualSavings.round()} / year
@@ -67,13 +82,49 @@ WhatsApp & Call Helpline: +91 99999 99999
     required String message,
   }) async {
     var clean = phone.replaceAll(RegExp(r'\D'), '');
+    if (clean.startsWith('0')) {
+      clean = clean.substring(1);
+    }
     if (clean.length == 10) {
       clean = '91$clean';
     }
-    final uri = Uri.parse('https://wa.me/$clean?text=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(uri)) {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    final encoded = Uri.encodeComponent(message);
+
+    // 1. Try native WhatsApp URI scheme (Launches WhatsApp chat directly)
+    final nativeUri = Uri.parse('whatsapp://send?phone=$clean&text=$encoded');
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        final ok = await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+        if (ok) return true;
+      }
+    } catch (e) {
+      debugPrint('WhatsApp native scheme error: $e');
     }
+
+    // 2. Try api.whatsapp.com deep link
+    final apiUri = Uri.parse('https://api.whatsapp.com/send?phone=$clean&text=$encoded');
+    try {
+      if (await canLaunchUrl(apiUri)) {
+        final ok = await launchUrl(apiUri, mode: LaunchMode.externalApplication);
+        if (ok) return true;
+      }
+    } catch (e) {
+      debugPrint('WhatsApp api deep link error: $e');
+    }
+
+    // 3. Fallback to wa.me universal link
+    final waMeUri = Uri.parse('https://wa.me/$clean?text=$encoded');
+    try {
+      if (await canLaunchUrl(waMeUri)) {
+        final ok = await launchUrl(waMeUri, mode: LaunchMode.externalApplication);
+        if (ok) return true;
+      }
+      return await launchUrl(waMeUri, mode: LaunchMode.platformDefault);
+    } catch (e) {
+      debugPrint('WhatsApp wa.me error: $e');
+    }
+
     return false;
   }
 

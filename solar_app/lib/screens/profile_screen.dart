@@ -82,17 +82,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _availableUpdate = null;
     });
 
-    final update = await UpdateService.checkForUpdate();
+    final result = await UpdateService.checkForUpdate();
 
     if (!mounted) return;
 
     setState(() {
       _isCheckingUpdate = false;
-      if (update != null) {
-        _availableUpdate = update;
-        _updateStatusMessage = lang.t('New version ${update.version} is available!', 'नया वर्जन ${update.version} उपलब्ध है!');
-      } else {
-        _updateStatusMessage = lang.t('Great! You already have the latest version (${UpdateService.currentVersion}).', 'बधाई! आपके पास पहले से नवीनतम वर्जन (${UpdateService.currentVersion}) है।');
+      switch (result.status) {
+        case UpdateCheckStatus.updateAvailable:
+          _availableUpdate = result.update;
+          _updateStatusMessage = lang.t(
+            'New version ${result.update!.version} is available!',
+            'नया वर्जन ${result.update!.version} उपलब्ध है!',
+          );
+          break;
+        case UpdateCheckStatus.upToDate:
+          _availableUpdate = null;
+          _updateStatusMessage = lang.t(
+            'Great! You already have the latest version (${result.currentVersion}).',
+            'बधाई! आपके पास पहले से नवीनतम वर्जन (${result.currentVersion}) है।',
+          );
+          break;
+        case UpdateCheckStatus.error:
+          _availableUpdate = null;
+          _updateStatusMessage = lang.t(
+            'Could not check for update: ${result.errorMessage ?? "Network error"}. Check internet connection.',
+            'अपडेट की जांच नहीं हो सकी: ${result.errorMessage ?? "नेटवर्क त्रुटि"}। कृपया इंटरनेट जांचें।',
+          );
+          break;
       }
     });
   }
