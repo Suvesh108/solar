@@ -44,7 +44,17 @@ jobs:
 
       - name: Analyze Flutter project
         working-directory: solar_app
-        run: flutter analyze
+        run: |
+          flutter analyze > /tmp/analyze.log 2>&1 || true
+          cat /tmp/analyze.log
+          echo "### Flutter Analyze Output" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/analyze.log >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if grep -q "error •" /tmp/analyze.log; then
+            echo "Analyze found errors!"
+            exit 1
+          fi
 
       - name: Build Signed Release APK
         working-directory: solar_app
