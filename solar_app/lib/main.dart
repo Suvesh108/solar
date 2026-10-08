@@ -21,7 +21,7 @@ class SunwardSolarApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sunward Solar',
+      title: 'Sunward',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const MainTabScreen(),

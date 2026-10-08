@@ -14,16 +14,16 @@ class CalculatorScreen extends StatefulWidget {
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerProviderStateMixin {
-  final _billController = TextEditingController(text: '5000');
-  final _kwController = TextEditingController(text: '3.0');
+  final _billController = TextEditingController(text: '0');
+  final _kwController = TextEditingController(text: '0');
   
   // Custom Rates & Hardware Plate Settings
-  final _plateCountController = TextEditingController(text: '6');
-  final _plateCostController = TextEditingController(text: '7500'); // ₹7,500 per 540W plate
+  final _plateCountController = TextEditingController(text: '0');
+  final _plateCostController = TextEditingController(text: '0');
   final _tariffController = TextEditingController(text: '7');       // ₹7/unit
-  final _installRateController = TextEditingController(text: '10000'); // ₹10,000/kW fitting
-  final _extraCostController = TextEditingController(text: '15000');  // Inverter & Wiring
-  final _subsidyController = TextEditingController(text: '98000');   // Govt Subsidy
+  final _installRateController = TextEditingController(text: '0');
+  final _extraCostController = TextEditingController(text: '0');
+  final _subsidyController = TextEditingController(text: '0');
 
   // Bank Loan & EMI Settings
   final _loanAmountController = TextEditingController(text: '0');
@@ -42,7 +42,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _recalculateSubsidy(3.0, _propertyType);
+    _recalculateSubsidy(0.0, _propertyType);
   }
 
   @override
@@ -61,16 +61,33 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     super.dispose();
   }
 
+  void _resetCalculator() {
+    setState(() {
+      _billController.text = '0';
+      _kwController.text = '0';
+      _plateCountController.text = '0';
+      _plateCostController.text = '0';
+      _tariffController.text = '7';
+      _installRateController.text = '0';
+      _extraCostController.text = '0';
+      _subsidyController.text = '0';
+      _loanAmountController.text = '0';
+      _interestRateController.text = '8.5';
+      _loanTenureController.text = '5';
+      _propertyType = 'Residential';
+    });
+  }
+
   double get _bill => double.tryParse(_billController.text) ?? 0;
   double get _kw => double.tryParse(_kwController.text) ?? 0;
   int get _plateCount => int.tryParse(_plateCountController.text) ?? 0;
-  double get _plateCost => double.tryParse(_plateCostController.text) ?? 7500;
+  double get _plateCost => double.tryParse(_plateCostController.text) ?? 0;
   double get _tariff {
     final t = double.tryParse(_tariffController.text) ?? 7;
     return t > 0 ? t : 7;
   }
-  double get _installRate => double.tryParse(_installRateController.text) ?? 10000;
-  double get _extraCost => double.tryParse(_extraCostController.text) ?? 15000;
+  double get _installRate => double.tryParse(_installRateController.text) ?? 0;
+  double get _extraCost => double.tryParse(_extraCostController.text) ?? 0;
   double get _subsidy => double.tryParse(_subsidyController.text) ?? 0;
 
   double get _loanAmount => double.tryParse(_loanAmountController.text) ?? 0;
@@ -112,55 +129,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   }
 
   void _onBillChanged(String val) {
-    setState(() {
-      final nBill = double.tryParse(val) ?? 0;
-      if (nBill > 0) {
-        final recKw = ((nBill / _tariff) / unitsPerKwMonth).ceil().toDouble();
-        final finalKw = recKw < 1.0 ? 1.0 : recKw;
-        _kwController.text = finalKw.toStringAsFixed(1);
-        final plates = ((finalKw * 1000) / plateWattage).ceil();
-        _plateCountController.text = plates.toString();
-        _recalculateSubsidy(finalKw, _propertyType);
-      } else {
-        _kwController.text = '0';
-        _plateCountController.text = '0';
-        _subsidyController.text = '0';
-      }
-    });
+    setState(() {});
   }
 
   void _onKwChanged(String val) {
     setState(() {
       final nKw = double.tryParse(val) ?? 0;
-      if (nKw > 0) {
-        final estBill = (nKw * unitsPerKwMonth * _tariff).round();
-        _billController.text = estBill.toString();
-        final plates = ((nKw * 1000) / plateWattage).ceil();
-        _plateCountController.text = plates.toString();
-        _recalculateSubsidy(nKw, _propertyType);
-      } else {
-        _billController.text = '0';
-        _plateCountController.text = '0';
-        _subsidyController.text = '0';
-      }
+      _recalculateSubsidy(nKw, _propertyType);
     });
   }
 
   void _onPlateCountChanged(String val) {
-    setState(() {
-      final pCount = int.tryParse(val) ?? 0;
-      if (pCount > 0) {
-        final calcKw = (pCount * plateWattage) / 1000.0;
-        _kwController.text = calcKw.toStringAsFixed(1);
-        final estBill = (calcKw * unitsPerKwMonth * _tariff).round();
-        _billController.text = estBill.toString();
-        _recalculateSubsidy(calcKw, _propertyType);
-      } else {
-        _kwController.text = '0';
-        _billController.text = '0';
-        _subsidyController.text = '0';
-      }
-    });
+    setState(() {});
   }
 
   void _onPropertyTypeChanged(String? val) {
@@ -173,7 +153,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
   void _selectKwPreset(double kw) {
     _kwController.text = kw.toStringAsFixed(1);
-    _onKwChanged(kw.toString());
+    _recalculateSubsidy(kw, _propertyType);
+    setState(() {});
   }
 
   void _showQuoteDialog(BuildContext context) {
@@ -209,319 +190,479 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 24,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      lang.t('Customer Quotation & Booking', 'ग्राहक कोटेशन व बुकिंग'),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.ink,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            left: 18,
+            right: 18,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        lang.t('Customer Quotation & Booking', 'ग्राहक कोटेशन व बुकिंग'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.ink,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
-              // Visual Quotation Receipt Card for capture
-              RepaintBoundary(
-                key: _quotationBoundaryKey,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.ink,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(6),
-                                child: Image.asset('assets/logo.png', height: 28, width: 28),
+                // Visual Quotation Card (Golden Amber matching Total Estimate Card)
+                RepaintBoundary(
+                  key: _quotationBoundaryKey,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.sun,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.ink.withOpacity(0.16),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Header with Logo, Sunward Solar branding, and kW badge
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.asset('assets/logo.png', height: 32, width: 32, fit: BoxFit.cover),
+                                ),
+                                const SizedBox(width: 8),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'SUNWARD SOLAR',
+                                      style: TextStyle(
+                                        color: AppColors.ink,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 14,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Official Rooftop Solar Estimate',
+                                      style: TextStyle(
+                                        color: AppColors.ink.withOpacity(0.75),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: AppColors.ink,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'SUNWARD SOLAR',
-                                style: TextStyle(
-                                  color: AppColors.sun,
+                              child: Text(
+                                '${kw.toStringAsFixed(1)} kW System',
+                                style: const TextStyle(
+                                  color: AppColors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  letterSpacing: 1.1,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Customer Details Banner
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Customer: ${nameCtrl.text.trim().isEmpty ? "Valued Client" : nameCtrl.text.trim()}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.ink),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                locationCtrl.text.trim().isEmpty ? _propertyType : '${locationCtrl.text.trim()} • $_propertyType',
+                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.ink),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Three Main Hero Numbers (Price You Pay, Yearly Savings, 25-Yr Profit)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _buildHeroStat(
+                                  'Price You Pay',
+                                  _currencyFormat.format(netPayable),
+                                  'After subsidy',
+                                ),
+                              ),
+                              Container(width: 1, height: 36, color: AppColors.ink.withOpacity(0.18)),
+                              Expanded(
+                                child: _buildHeroStat(
+                                  'Yearly Savings',
+                                  _currencyFormat.format(annualSavings),
+                                  '₹${_numFormat.format(monthlySavings)}/mo',
+                                ),
+                              ),
+                              Container(width: 1, height: 36, color: AppColors.ink.withOpacity(0.18)),
+                              Expanded(
+                                child: _buildHeroStat(
+                                  '25-Yr Profit',
+                                  _currencyFormat.format(profit25 > 0 ? profit25 : 0),
+                                  '$payback Yrs Payback',
                                 ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.sun,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${kw.toStringAsFixed(1)} kW System',
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 11,
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Detailed Cost Breakdown Box
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.white.withOpacity(0.65),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'PAISA KAHAN LAGEGA (COST BREAKDOWN)',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.ink),
                               ),
+                              const SizedBox(height: 6),
+                              _buildPriceRow('Solar Plates ($pCount × ₹${pCost.round()})', _currencyFormat.format(totalPlatesCost)),
+                              _buildPriceRow('Structure & Fitting', _currencyFormat.format(installCost)),
+                              _buildPriceRow('Inverter & Wiring', _currencyFormat.format(extraCost)),
+                              const Divider(height: 10, thickness: 1, color: AppColors.ink),
+                              _buildPriceRow('Total System Cost', _currencyFormat.format(totalSystemCost), isBold: true),
+                              _buildPriceRow('Govt Subsidy Discount', sub > 0 ? '-${_currencyFormat.format(sub)}' : '₹0', isGreen: true),
+                              const SizedBox(height: 3),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Final Amount To Pay:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.ink)),
+                                  Text(_currencyFormat.format(netPayable), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.ink)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Bank Loan & EMI Box (if loan > 0)
+                        if (loanAmt > 0) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.white.withOpacity(0.65),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('BANK LOAN & EMI (KIST HISAAB)', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.ink)),
+                                    Text('$years Yrs @ $rate%', style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.teal)),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                _buildPriceRow('Sanctioned Loan', _currencyFormat.format(loanAmt)),
+                                _buildPriceRow('Monthly EMI', '${_currencyFormat.format(emi)} / mo'),
+                                _buildPriceRow('Down Payment', _currencyFormat.format(downPayment)),
+                              ],
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildReceiptMiniStat('Solar Plates', '$pCount Nos (540W)'),
-                          _buildReceiptMiniStat('Net Price', _currencyFormat.format(netPayable)),
-                          _buildReceiptMiniStat('Payback', '$payback Yrs'),
-                        ],
-                      ),
-                      const Divider(color: Colors.white24, height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Total Price: ${_currencyFormat.format(totalSystemCost)}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 11),
-                          ),
-                          Text(
-                            'Subsidy: -${_currencyFormat.format(sub)}',
-                            style: const TextStyle(color: AppColors.sun, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      if (loanAmt > 0) ...[
-                        const Divider(color: Colors.white24, height: 16),
+                        const SizedBox(height: 8),
+
+                        // Generation specs & helpline footer
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _buildReceiptMiniStat('Bank Loan', _currencyFormat.format(loanAmt)),
-                            _buildReceiptMiniStat('Monthly EMI', '${_currencyFormat.format(emi)}/mo'),
-                            _buildReceiptMiniStat('Down Payment', _currencyFormat.format(downPayment)),
+                            Text(
+                              'Generation: ~${(kw * 120).round()} Units/mo • Rooftop: ~${(kw * 100).round()} sq.ft',
+                              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.ink),
+                            ),
+                            Text(
+                              'Sunward Solar Helpline',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.ink.withOpacity(0.85)),
+                            ),
                           ],
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: lang.t('Customer Name *', 'ग्राहक का नाम *'),
-                  hintText: 'e.g. Ramesh Kulkarni',
-                  prefixIcon: const Icon(Icons.person_outline),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: lang.t('Customer Name *', 'ग्राहक का नाम *'),
+                    hintText: 'e.g. Ramesh Kulkarni',
+                    prefixIcon: const Icon(Icons.person_outline),
+                  ),
+                  onChanged: (_) => setModalState(() {}),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: lang.t('Mobile / WhatsApp Number *', 'मोबाइल / व्हाट्सऐप नंबर *'),
-                  hintText: 'e.g. 9822012345',
-                  prefixIcon: const Icon(Icons.phone_outlined),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: lang.t('Mobile / WhatsApp Number *', 'मोबाइल / व्हाट्सऐप नंबर *'),
+                    hintText: 'e.g. 9822012345',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                  ),
+                  onChanged: (_) => setModalState(() {}),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: locationCtrl,
-                decoration: InputDecoration(
-                  labelText: lang.t('Location / City *', 'शहर / इलाका *'),
-                  hintText: 'e.g. Pune, Maharashtra',
-                  prefixIcon: const Icon(Icons.location_on_outlined),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: locationCtrl,
+                  decoration: InputDecoration(
+                    labelText: lang.t('Location / City *', 'शहर / इलाका *'),
+                    hintText: 'e.g. Pune, Maharashtra',
+                    prefixIcon: const Icon(Icons.location_on_outlined),
+                  ),
+                  onChanged: (_) => setModalState(() {}),
                 ),
-              ),
-              const SizedBox(height: 18),
+                const SizedBox(height: 16),
 
-              // Action 1: Save Lead & Send Directly via WhatsApp
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366), // WhatsApp brand green
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.chat, size: 20),
-                label: Text(
-                  lang.t('Send Quote to WhatsApp', 'व्हाट्सऐप पर कोटेशन भेजें'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  final phone = phoneCtrl.text.trim();
-                  final loc = locationCtrl.text.trim();
+                // Primary Action: Save Lead & Send WhatsApp Card Image
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366), // WhatsApp brand green
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 3,
+                  ),
+                  icon: const Icon(Icons.share, size: 20),
+                  label: Text(
+                    lang.t('Save & Send Card to WhatsApp', 'कार्ड सेव करें व व्हाट्सऐप पर भेजें'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final phone = phoneCtrl.text.trim();
+                    final loc = locationCtrl.text.trim();
 
-                  if (name.isEmpty || phone.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                    if (name.isEmpty || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                      );
+                      return;
+                    }
+
+                    // 1. Save Lead
+                    await LeadService.instance.addLead(
+                      name: name,
+                      phone: phone,
+                      location: loc.isEmpty ? 'Direct' : loc,
+                      monthlyBill: _bill.toInt().toString(),
+                      propertyType: _propertyType,
                     );
-                    return;
-                  }
 
-                  // 1. Save Lead
-                  await LeadService.instance.addLead(
-                    name: name,
-                    phone: phone,
-                    location: loc.isEmpty ? 'Direct' : loc,
-                    monthlyBill: _bill.toInt().toString(),
-                    propertyType: _propertyType,
-                  );
-
-                  // 2. Format Quote
-                  final quoteMsg = QuoteShareService.formatWhatsAppQuote(
-                    customerName: name,
-                    phone: phone,
-                    location: loc.isEmpty ? 'Direct' : loc,
-                    propertyType: _propertyType,
-                    kw: kw,
-                    plateCount: pCount,
-                    platePrice: pCost,
-                    totalPlatesCost: totalPlatesCost,
-                    installCost: installCost,
-                    inverterWiringCost: extraCost,
-                    totalSystemCost: totalSystemCost,
-                    subsidy: sub,
-                    netPayable: netPayable,
-                    monthlySavings: monthlySavings,
-                    annualSavings: annualSavings,
-                    paybackYears: payback,
-                    profit25Years: profit25,
-                    loanAmount: loanAmt > 0 ? loanAmt : null,
-                    emiAmount: loanAmt > 0 ? emi : null,
-                    loanYears: loanAmt > 0 ? years : null,
-                  );
-
-                  if (mounted) Navigator.pop(ctx);
-
-                  // 3. Open WhatsApp
-                  await QuoteShareService.openWhatsApp(
-                    phone: phone,
-                    message: quoteMsg,
-                  );
-                },
-              ),
-              const SizedBox(height: 10),
-
-              // Action 2: Share Quote Card Image
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.ink,
-                  side: const BorderSide(color: AppColors.ink, width: 1.5),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                icon: const Icon(Icons.image_outlined, size: 19),
-                label: Text(
-                  lang.t('Share Quotation Image Card', 'कोटेशन कार्ड इमेज शेयर करें'),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                ),
-                onPressed: () async {
-                  final name = nameCtrl.text.trim().isEmpty ? 'Customer' : nameCtrl.text.trim();
-                  final quoteMsg = QuoteShareService.formatWhatsAppQuote(
-                    customerName: name,
-                    phone: phoneCtrl.text.trim().isEmpty ? '-' : phoneCtrl.text.trim(),
-                    location: locationCtrl.text.trim().isEmpty ? 'Direct' : locationCtrl.text.trim(),
-                    propertyType: _propertyType,
-                    kw: kw,
-                    plateCount: pCount,
-                    platePrice: pCost,
-                    totalPlatesCost: totalPlatesCost,
-                    installCost: installCost,
-                    inverterWiringCost: extraCost,
-                    totalSystemCost: totalSystemCost,
-                    subsidy: sub,
-                    netPayable: netPayable,
-                    monthlySavings: monthlySavings,
-                    annualSavings: annualSavings,
-                    paybackYears: payback,
-                    profit25Years: profit25,
-                    loanAmount: loanAmt > 0 ? loanAmt : null,
-                    emiAmount: loanAmt > 0 ? emi : null,
-                    loanYears: loanAmt > 0 ? years : null,
-                  );
-
-                  await QuoteShareService.shareQuotationImage(
-                    key: _quotationBoundaryKey,
-                    text: quoteMsg,
-                    customerName: name,
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-
-              // Action 3: Save Only to Leads
-              TextButton(
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  final phone = phoneCtrl.text.trim();
-                  final loc = locationCtrl.text.trim();
-
-                  if (name.isEmpty || phone.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                    // 2. Format Quote Caption
+                    final quoteMsg = QuoteShareService.formatWhatsAppQuote(
+                      customerName: name,
+                      phone: phone,
+                      location: loc.isEmpty ? 'Direct' : loc,
+                      propertyType: _propertyType,
+                      kw: kw,
+                      plateCount: pCount,
+                      platePrice: pCost,
+                      totalPlatesCost: totalPlatesCost,
+                      installCost: installCost,
+                      inverterWiringCost: extraCost,
+                      totalSystemCost: totalSystemCost,
+                      subsidy: sub,
+                      netPayable: netPayable,
+                      monthlySavings: monthlySavings,
+                      annualSavings: annualSavings,
+                      paybackYears: payback,
+                      profit25Years: profit25,
+                      loanAmount: loanAmt > 0 ? loanAmt : null,
+                      emiAmount: loanAmt > 0 ? emi : null,
+                      loanYears: loanAmt > 0 ? years : null,
                     );
-                    return;
-                  }
 
-                  await LeadService.instance.addLead(
-                    name: name,
-                    phone: phone,
-                    location: loc.isEmpty ? 'Direct' : loc,
-                    monthlyBill: _bill.toInt().toString(),
-                    propertyType: _propertyType,
-                  );
-
-                  if (mounted) {
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        backgroundColor: AppColors.teal,
-                        content: Text(lang.t('Lead saved successfully to Leads tab!', 'लीड सफलतापूर्वक सेव हो गई!')),
-                      ),
+                    // 3. Capture & Share image card
+                    await QuoteShareService.shareQuotationImage(
+                      key: _quotationBoundaryKey,
+                      text: quoteMsg,
+                      customerName: name,
                     );
-                  }
-                },
-                child: Text(
-                  lang.t('Save Only to Leads Tab', 'सिर्फ लीड्स टैब में सेव करें'),
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+
+                    // 4. Pop modal and Reset calculator to 0
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      _resetCalculator();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: AppColors.teal,
+                          content: Text(lang.t('Quotation saved & shared! Calculator reset to 0.', 'कोटेशन सेव और शेयर हो गया! कैलकुलेटर 0 पर रीसेट हो गया।')),
+                        ),
+                      );
+                    }
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+
+                // Secondary Action: Send WhatsApp Text Direct Chat
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink,
+                    side: const BorderSide(color: AppColors.ink, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: Text(
+                    lang.t('Send Text Only via WhatsApp', 'सिर्फ टेक्स्ट व्हाट्सऐप पर भेजें'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final phone = phoneCtrl.text.trim();
+                    final loc = locationCtrl.text.trim();
+
+                    if (name.isEmpty || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                      );
+                      return;
+                    }
+
+                    await LeadService.instance.addLead(
+                      name: name,
+                      phone: phone,
+                      location: loc.isEmpty ? 'Direct' : loc,
+                      monthlyBill: _bill.toInt().toString(),
+                      propertyType: _propertyType,
+                    );
+
+                    final quoteMsg = QuoteShareService.formatWhatsAppQuote(
+                      customerName: name,
+                      phone: phone,
+                      location: loc.isEmpty ? 'Direct' : loc,
+                      propertyType: _propertyType,
+                      kw: kw,
+                      plateCount: pCount,
+                      platePrice: pCost,
+                      totalPlatesCost: totalPlatesCost,
+                      installCost: installCost,
+                      inverterWiringCost: extraCost,
+                      totalSystemCost: totalSystemCost,
+                      subsidy: sub,
+                      netPayable: netPayable,
+                      monthlySavings: monthlySavings,
+                      annualSavings: annualSavings,
+                      paybackYears: payback,
+                      profit25Years: profit25,
+                      loanAmount: loanAmt > 0 ? loanAmt : null,
+                      emiAmount: loanAmt > 0 ? emi : null,
+                      loanYears: loanAmt > 0 ? years : null,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      _resetCalculator();
+                    }
+
+                    await QuoteShareService.openWhatsApp(phone: phone, message: quoteMsg);
+                  },
+                ),
+                const SizedBox(height: 6),
+
+                // Tertiary Action: Save Only to Leads Tab
+                TextButton(
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    final phone = phoneCtrl.text.trim();
+                    final loc = locationCtrl.text.trim();
+
+                    if (name.isEmpty || phone.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                      );
+                      return;
+                    }
+
+                    await LeadService.instance.addLead(
+                      name: name,
+                      phone: phone,
+                      location: loc.isEmpty ? 'Direct' : loc,
+                      monthlyBill: _bill.toInt().toString(),
+                      propertyType: _propertyType,
+                    );
+
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      _resetCalculator();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: AppColors.teal,
+                          content: Text(lang.t('Lead saved to Leads tab! Calculator reset to 0.', 'लीड सेव हो गई! कैलकुलेटर 0 पर रीसेट हो गया।')),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(
+                    lang.t('Save Only to Leads Tab', 'सिर्फ लीड्स टैब में सेव करें'),
+                    style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -592,8 +733,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 const Text('Sunward Solar'),
               ],
             ),
-            actions: const [
-              LanguageToggleButton(),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                tooltip: lang.t('Reset Calculator to 0', 'कैलकुलेटर 0 पर रीसेट करें'),
+                onPressed: _resetCalculator,
+              ),
+              const LanguageToggleButton(),
             ],
           ),
           body: SingleChildScrollView(
@@ -742,8 +888,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         const SizedBox(height: 4),
                         Text(
                           lang.t(
-                            'Enter plate count & price per plate; kW and total cost compute automatically:',
-                            'प्लेट संख्या और प्रति प्लेट कीमत डालें; kW और कुल खर्च अपने आप निकलेगा:',
+                            'Enter plate count & price per plate manually to customize your exact hisaab:',
+                            'प्लेट संख्या व रेट दर्ज करके अपना सटीक हिसाब बनाएं:',
                           ),
                           style: const TextStyle(fontSize: 11, color: AppColors.muted),
                         ),
@@ -1121,8 +1267,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           ),
                           icon: const Icon(Icons.send_rounded, size: 20),
                           label: Text(
-                            lang.t('Free Site Checkup & WhatsApp Quote', 'घर पर फ्री चेकअप और व्हाट्सऐप कोटेशन'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            lang.t('Save & Send', 'सेव और भेजें (Save & Send)'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),

@@ -42,7 +42,7 @@ class UpdateCheckResult {
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.4';
+  static const String currentVersion = 'v0.0.5';
   static const String _releasesListUrl = 'https://api.github.com/repos/Suvesh108/solar/releases';
 
   static Future<UpdateCheckResult> checkForUpdate() async {
@@ -161,7 +161,7 @@ class UpdateService {
 
       final totalBytes = response.contentLength ?? 0;
       final tempDir = await getTemporaryDirectory();
-      final apkFile = File('${tempDir.path}/sunward-solar-update.apk');
+      final apkFile = File('${tempDir.path}/Sunward.apk');
 
       if (await apkFile.exists()) {
         await apkFile.delete();

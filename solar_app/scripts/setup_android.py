@@ -48,11 +48,13 @@ def setup_android():
         <package android:name="com.whatsapp.w4b" />
     </queries>
 """
+        import re
+        content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward"', content)
         if "<queries>" not in content:
             content = content.replace("<application", permissions + "\n    <application")
-            with open(manifest_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print("Injected permissions and queries into AndroidManifest.xml.")
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print("Configured Sunward app label and injected permissions/queries into AndroidManifest.xml.")
 
     # 3. Configure Signing in build.gradle.kts or build.gradle
     app_gradle_kts = os.path.join(base_dir, "android", "app", "build.gradle.kts")
