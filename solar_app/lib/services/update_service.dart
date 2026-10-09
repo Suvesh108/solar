@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
@@ -45,22 +46,24 @@ class UpdateCheckResult {
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.7';
-  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/download/v0.0.7/Sunward.apk';
+  static const String currentVersion = 'v0.0.8';
+  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/download/v0.0.8/Sunward.apk';
 
-  // Multi-tier endpoints with cache busters to guarantee live connectivity on all networks
+  // Multi-tier endpoints verified to be accessible without ISP blocking or rate limiting
   static List<String> get versionEndpoints {
     final t = DateTime.now().millisecondsSinceEpoch;
     return [
-      // Tier 1: Fast CDN with Indian edge servers (Mumbai, Delhi) with cache-buster
-      'https://cdn.jsdelivr.net/gh/Suvesh108/solar@main/version.json?t=$t',
-      // Tier 2: GitHub Raw JSON with cache-buster
+      // Tier 1: Direct github.com raw file (never blocked by Indian ISPs, zero API rate limit)
+      'https://github.com/Suvesh108/solar/raw/main/version.json?t=$t',
+      // Tier 2: Raw GitHack mirror (zero proxy cache, instant real-time sync)
+      'https://raw.githack.com/Suvesh108/solar/main/version.json?t=$t',
+      // Tier 3: Statically CDN (Cloudflare edge proxy)
+      'https://cdn.statically.io/gh/Suvesh108/solar/main/version.json?t=$t',
+      // Tier 4: GitHub rawusercontent
       'https://raw.githubusercontent.com/Suvesh108/solar/main/version.json?t=$t',
-      // Tier 3: Fastly JSDelivr mirror
-      'https://fastly.jsdelivr.net/gh/Suvesh108/solar@main/version.json?t=$t',
-      // Tier 4: Official GitHub Releases API (latest)
+      // Tier 5: Official GitHub Releases API (latest)
       'https://api.github.com/repos/Suvesh108/solar/releases/latest',
-      // Tier 5: Official GitHub Releases API list
+      // Tier 6: Official GitHub Releases API list
       'https://api.github.com/repos/Suvesh108/solar/releases',
     ];
   }
@@ -74,7 +77,7 @@ class UpdateService {
           Uri.parse(endpoint),
           headers: {
             'Accept': 'application/json',
-            'User-Agent': 'SunwardSolarApp/$currentVersion',
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Mobile; SunwardSolar/$currentVersion)',
           },
         ).timeout(const Duration(seconds: 8));
 
@@ -200,44 +203,67 @@ class UpdateService {
     required String apkUrl,
     required void Function(double progress) onProgress,
   }) async {
+    HttpClient? client;
+    IOSink? sink;
+    File? apkFile;
+
     try {
-      final client = http.Client();
-      var currentUrl = apkUrl;
-      http.StreamedResponse? response;
+      // 1. Determine storage directory accessible to Android package installer
+      Directory? targetDir;
+      try {
+        final extDirs = await getExternalCacheDirectories();
+        if (extDirs != null && extDirs.isNotEmpty) {
+          targetDir = extDirs.first;
+        }
+      } catch (_) {}
+      targetDir ??= await getTemporaryDirectory();
 
-      // Handle up to 8 HTTP redirects across domains (e.g. GitHub Releases -> Azure/AWS blob CDN)
-      for (int i = 0; i < 8; i++) {
-        final request = http.Request('GET', Uri.parse(currentUrl));
-        request.headers['User-Agent'] = 'SunwardSolarApp/$currentVersion';
-        request.headers['Accept'] = '*/*';
+      apkFile = File('${targetDir.path}/Sunward.apk');
+      if (await apkFile.exists()) {
+        try {
+          await apkFile.delete();
+        } catch (_) {}
+      }
+
+      // 2. Open HTTP client with connection and idle timeouts
+      client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 25);
+      client.idleTimeout = const Duration(seconds: 25);
+
+      Uri currentUri = Uri.parse(apkUrl);
+      HttpClientResponse? finalResponse;
+
+      // 3. Follow HTTP 301/302 redirects cleanly, draining the previous stream to prevent socket deadlock
+      for (int i = 0; i < 10; i++) {
+        final request = await client.getUrl(currentUri);
         request.followRedirects = false;
+        request.headers.set(HttpHeaders.userAgentHeader, 'Mozilla/5.0 (Linux; Android 14; Mobile; SunwardSolar/$currentVersion)');
+        request.headers.set(HttpHeaders.acceptHeader, '*/*');
 
-        final resp = await client.send(request);
-        if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.containsKey('location')) {
-          currentUrl = resp.headers['location']!;
+        final resp = await request.close();
+
+        if (resp.isRedirect && resp.headers.value(HttpHeaders.locationHeader) != null) {
+          final location = resp.headers.value(HttpHeaders.locationHeader)!;
+          currentUri = currentUri.resolve(location);
+          // CRITICAL: Draining stream frees the underlying socket connection!
+          await resp.drain();
           continue;
         }
-        response = resp;
+
+        finalResponse = resp;
         break;
       }
 
-      if (response == null || response.statusCode != 200) {
-        debugPrint('Download failed with HTTP ${response?.statusCode} at $currentUrl');
+      if (finalResponse == null || finalResponse.statusCode != 200) {
+        debugPrint('Download failed with status: ${finalResponse?.statusCode} at $currentUri');
         return null;
       }
 
-      final totalBytes = response.contentLength ?? 0;
-      final tempDir = await getTemporaryDirectory();
-      final apkFile = File('${tempDir.path}/Sunward.apk');
-
-      if (await apkFile.exists()) {
-        await apkFile.delete();
-      }
-
-      final sink = apkFile.openWrite();
+      final totalBytes = finalResponse.contentLength;
+      sink = apkFile.openWrite();
       int receivedBytes = 0;
 
-      await for (final chunk in response.stream) {
+      await for (final chunk in finalResponse) {
         sink.add(chunk);
         receivedBytes += chunk.length;
         if (totalBytes > 0) {
@@ -247,17 +273,36 @@ class UpdateService {
 
       await sink.flush();
       await sink.close();
+      sink = null;
 
-      // Launch native package installer directly
-      await OpenFilex.open(
-        apkFile.path,
-        type: 'application/vnd.android.package-archive',
-      );
+      // 4. Trigger installation: First try native FileProvider MethodChannel, fallback to OpenFilex
+      bool installed = false;
+      try {
+        const platform = MethodChannel('com.sunward.solar/whatsapp');
+        final res = await platform.invokeMethod<bool>('installApk', {'filePath': apkFile.path});
+        if (res == true) {
+          installed = true;
+        }
+      } catch (e) {
+        debugPrint('Native install method error: $e');
+      }
+
+      if (!installed) {
+        await OpenFilex.open(
+          apkFile.path,
+          type: 'application/vnd.android.package-archive',
+        );
+      }
 
       return apkFile;
-    } catch (e) {
-      debugPrint('Error downloading update: $e');
+    } catch (e, stack) {
+      debugPrint('Error downloading update: $e\n$stack');
+      try {
+        await sink?.close();
+      } catch (_) {}
       return null;
+    } finally {
+      client?.close();
     }
   }
 

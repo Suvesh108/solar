@@ -1,8 +1,8 @@
 {
-  "version": "v0.0.7",
-  "versionCode": 7,
-  "notes": "Direct WhatsApp chatbox dispatch with card attached, smart 0-clearing responsive inputs, in-app internal APK download & install without external browser.",
-  "apkUrl": "https://github.com/Suvesh108/solar/releases/download/v0.0.7/Sunward.apk",
+  "version": "v0.0.8",
+  "versionCode": 8,
+  "notes": "Unblocked multi-tier update mirrors, socket-drained streaming downloader, external cache storage, and native Android FileProvider package installer.",
+  "apkUrl": "https://github.com/Suvesh108/solar/releases/download/v0.0.8/Sunward.apk",
   "fallbackApkUrl": "https://github.com/Suvesh108/solar/releases/latest/download/Sunward.apk",
-  "apkSize": 26000000
+  "apkSize": 54606311
 }
