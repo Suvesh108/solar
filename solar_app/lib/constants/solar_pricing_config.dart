@@ -1,5 +1,7 @@
 class SolarPricingConfig {
-  /// Turnkey base solar price per kilowatt (industry standard in India)
+  /// Turnkey base solar price per kilowatt: Residential = ₹70,000, Commercial = ₹50,000
+  static const double basePricePerKwResidential = 70000.0;
+  static const double basePricePerKwCommercial = 50000.0;
   static const double basePricePerKw = 70000.0;
 
   /// Default electricity tariff rate in ₹/unit
@@ -21,9 +23,17 @@ class SolarPricingConfig {
   /// Approximate shadow-free roof area per kilowatt (sq. ft.)
   static const int sqFtPerKw = 100;
 
-  /// Calculates turnkey base price from capacity
-  static double calculateBasePrice(double kw) {
-    return kw > 0 ? (kw * basePricePerKw) : 0.0;
+  /// Base rate per kW depending on property type
+  static double getRatePerKw(String propertyType) {
+    if (propertyType.trim().toLowerCase() == 'commercial') {
+      return basePricePerKwCommercial;
+    }
+    return basePricePerKwResidential;
+  }
+
+  /// Calculates turnkey base price from capacity and property type
+  static double calculateBasePrice(double kw, [String propertyType = 'Residential']) {
+    return kw > 0 ? (kw * getRatePerKw(propertyType)) : 0.0;
   }
 
   /// Calculates auto-estimated plate count from capacity

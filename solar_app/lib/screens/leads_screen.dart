@@ -188,11 +188,10 @@ class _LeadsScreenState extends State<LeadsScreen> {
       builder: (context, _, __) {
         return Scaffold(
           appBar: AppBar(
-            title: Text(lang.t('Customer Leads', 'ग्राहक लीड्स')),
+            title: const Text('Customer Leads'),
             actions: [
-              const LanguageToggleButton(),
               IconButton(
-                tooltip: lang.t('Add Lead', 'लीड जोड़ें'),
+                tooltip: 'Add Lead',
                 icon: const Icon(Icons.person_add_alt_1),
                 onPressed: () => _showAddLeadModal(context),
               ),
@@ -338,14 +337,38 @@ class _LeadsScreenState extends State<LeadsScreen> {
                                             onSelected: (newStatus) {
                                               LeadService.instance.updateStatus(lead.id, newStatus);
                                             },
-                                            itemBuilder: (context) => LeadStatus.values
-                                                .map(
-                                                  (s) => PopupMenuItem(
-                                                    value: s,
-                                                    child: Text(s.label),
-                                                  ),
-                                                )
-                                                .toList(),
+                                            itemBuilder: (context) => LeadStatus.values.map((s) {
+                                              final isCurrent = s == lead.status;
+                                              final color = _getStatusColor(s);
+                                              return PopupMenuItem(
+                                                value: s,
+                                                child: Row(
+                                                  children: [
+                                                    Container(
+                                                      width: 8,
+                                                      height: 8,
+                                                      decoration: BoxDecoration(
+                                                        color: color,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 10),
+                                                    Expanded(
+                                                      child: Text(
+                                                        s.label,
+                                                        style: TextStyle(
+                                                          fontSize: 13.5,
+                                                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                                          color: AppColors.ink,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if (isCurrent)
+                                                      const Icon(Icons.check_rounded, size: 16, color: AppColors.teal),
+                                                  ],
+                                                ),
+                                              );
+                                            }).toList(),
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                               decoration: BoxDecoration(

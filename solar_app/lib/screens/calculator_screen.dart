@@ -7,6 +7,7 @@ import '../services/language_service.dart';
 import '../services/lead_service.dart';
 import '../services/quote_share_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_custom_dropdown.dart';
 import '../widgets/quotation_card.dart';
 
 class CalculatorScreen extends StatefulWidget {
@@ -28,8 +29,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
   // Custom Rates & Balance of Plant
   final _tariffController = TextEditingController(text: '7');       // ₹7/unit
-  final _installRateController = TextEditingController(text: '0');  // Optional extra fitting ₹/kW
-  final _extraCostController = TextEditingController(text: '0');    // Optional extra wiring ₹
+  final _extraCostController = TextEditingController(text: '0');    // Optional Converter / Battery charges
   final _subsidyController = TextEditingController(text: '0');
 
   // Bank Loan & EMI Settings (Default 5.76% p.a. PM Surya Ghar concessional rate)
@@ -42,7 +42,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   final _kwFocus = FocusNode();
   final _batteryCostFocus = FocusNode();
   final _tariffFocus = FocusNode();
-  final _installRateFocus = FocusNode();
   final _extraCostFocus = FocusNode();
   final _subsidyFocus = FocusNode();
   final _loanAmountFocus = FocusNode();
@@ -66,7 +65,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     });
     _setupAutoZero(_batteryCostController, _batteryCostFocus, () => setState(() {}));
     _setupAutoZero(_tariffController, _tariffFocus, () => setState(() {}));
-    _setupAutoZero(_installRateController, _installRateFocus, () => setState(() {}));
     _setupAutoZero(_extraCostController, _extraCostFocus, () => setState(() {}));
     _setupAutoZero(_subsidyController, _subsidyFocus, () => setState(() {}));
     _setupAutoZero(_loanAmountController, _loanAmountFocus, () => setState(() {}));
@@ -99,7 +97,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     _kwController.dispose();
     _batteryCostController.dispose();
     _tariffController.dispose();
-    _installRateController.dispose();
     _extraCostController.dispose();
     _subsidyController.dispose();
     _loanAmountController.dispose();
@@ -110,7 +107,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     _kwFocus.dispose();
     _batteryCostFocus.dispose();
     _tariffFocus.dispose();
-    _installRateFocus.dispose();
     _extraCostFocus.dispose();
     _subsidyFocus.dispose();
     _loanAmountFocus.dispose();
@@ -128,7 +124,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
       _batteryVoltage = '24V';
       _batteryCostController.text = '0';
       _tariffController.text = '7';
-      _installRateController.text = '0';
       _extraCostController.text = '0';
       _subsidyController.text = '0';
       _loanAmountController.text = '0';
@@ -142,12 +137,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   double get _kw => double.tryParse(_kwController.text) ?? 0;
   bool get _isHybrid => _installationType == 'Hybrid';
   double get _batteryPrice => _isHybrid ? (double.tryParse(_batteryCostController.text) ?? 0.0) : 0.0;
-  double get _baseSolarPrice => SolarPricingConfig.calculateBasePrice(_kw);
+  double get _baseSolarPrice => SolarPricingConfig.calculateBasePrice(_kw, _propertyType);
   double get _tariff {
     final t = double.tryParse(_tariffController.text) ?? 7;
     return t > 0 ? t : 7;
   }
-  double get _installRate => double.tryParse(_installRateController.text) ?? 0;
   double get _extraCost => double.tryParse(_extraCostController.text) ?? 0;
   double get _subsidy => double.tryParse(_subsidyController.text) ?? 0;
 
@@ -224,9 +218,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     final kw = _kw;
     final basePrice = _baseSolarPrice;
     final bPrice = _batteryPrice;
-    final installCost = kw * _installRate;
     final extraCost = _extraCost;
-    final totalSystemCost = basePrice + bPrice + installCost + extraCost;
+    final totalSystemCost = basePrice + bPrice + extraCost;
     final sub = _subsidy;
     final netPayable = (totalSystemCost - sub) > 0 ? (totalSystemCost - sub) : 0.0;
     final monthlySavings = kw * SolarPricingConfig.unitsPerKwMonth * _tariff;
@@ -366,7 +359,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       batteryVoltage: _isHybrid ? _batteryVoltage : null,
                       batteryPrice: bPrice,
                       baseSolarCost: basePrice,
-                      installCost: installCost,
+                      installCost: 0.0,
                       inverterWiringCost: extraCost,
                       totalSystemCost: totalSystemCost,
                       subsidy: sub,
@@ -457,7 +450,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                     batteryVoltage: _isHybrid ? _batteryVoltage : null,
                     batteryPrice: bPrice,
                     baseSolarCost: basePrice,
-                    installCost: installCost,
+                    installCost: 0.0,
                     inverterWiringCost: extraCost,
                     totalSystemCost: totalSystemCost,
                     subsidy: sub,
@@ -537,9 +530,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     // Financial Calculation with Capacity-based Pricing
     final basePrice = _baseSolarPrice;
     final bPrice = _batteryPrice;
-    final installCost = kw * _installRate;
     final otherCost = _extraCost;
-    final totalSystemCost = basePrice + bPrice + installCost + otherCost;
+    final totalSystemCost = basePrice + bPrice + otherCost;
     final effectiveSubsidy = hasKw ? _subsidy : 0.0;
     final finalPriceYouPay = (totalSystemCost - effectiveSubsidy) > 0 ? (totalSystemCost - effectiveSubsidy) : 0.0;
 
@@ -580,10 +572,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             actions: [
               IconButton(
                 icon: const Icon(Icons.refresh_rounded),
-                tooltip: lang.t('Reset Calculator to 0', 'कैलकुलेटर 0 पर रीसेट करें'),
+                tooltip: 'Reset Calculator to 0',
                 onPressed: _resetCalculator,
               ),
-              const LanguageToggleButton(),
             ],
           ),
           body: SingleChildScrollView(
@@ -601,15 +592,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.solar_power_outlined, size: 20, color: AppColors.teal),
+                            const Icon(Icons.solar_power_outlined, size: 22, color: AppColors.teal),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                lang.t('1. SOLAR SETUP & PRICING', '1. सोलर सेटअप व कीमत'),
+                                lang.t('1. SOLAR SETUP & PRICING', '1. सोलर सेटअप व दर'),
                                 style: const TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.1,
+                                  letterSpacing: 0.8,
                                   color: AppColors.teal,
                                 ),
                                 maxLines: 1,
@@ -618,59 +609,35 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          lang.t(
-                            'Choose plant type, property, and solar capacity (Turnkey @ ₹70,000/kW):',
-                            'सोलर प्रकार, जगह व प्लांट साइज चुनें (टर्नकी रेट ₹70,000/kW):',
-                          ),
-                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                        ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
 
                         // Installation Type Selector: On-Grid vs Hybrid
-                        Text(
-                          lang.t('Installation Type', 'सोलर प्लांट प्रकार'),
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        const Text(
+                          'Installation Type',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 6),
                         Row(
                           children: [
                             Expanded(
-                              child: ChoiceChip(
-                                avatar: const Icon(Icons.wb_sunny_outlined, size: 16),
-                                label: Text(lang.t('On-Grid (Net Meter)', 'ऑन-ग्रिड (नेट मीटर)')),
-                                labelStyle: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: _installationType == 'On-Grid' ? AppColors.ink : AppColors.muted,
-                                ),
-                                selected: _installationType == 'On-Grid',
-                                selectedColor: AppColors.sun,
-                                backgroundColor: AppColors.cream,
-                                showCheckmark: false,
-                                onSelected: (_) {
+                              child: _buildInstallationTypeButton(
+                                label: 'On-Grid',
+                                icon: Icons.wb_sunny_outlined,
+                                isSelected: _installationType == 'On-Grid',
+                                onTap: () {
                                   setState(() {
                                     _installationType = 'On-Grid';
                                   });
                                 },
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 10),
                             Expanded(
-                              child: ChoiceChip(
-                                avatar: const Icon(Icons.battery_charging_full, size: 16),
-                                label: Text(lang.t('Hybrid (With Battery)', 'हाइब्रिड (बैटरी सहित)')),
-                                labelStyle: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: _installationType == 'Hybrid' ? AppColors.ink : AppColors.muted,
-                                ),
-                                selected: _installationType == 'Hybrid',
-                                selectedColor: AppColors.sun,
-                                backgroundColor: AppColors.cream,
-                                showCheckmark: false,
-                                onSelected: (_) {
+                              child: _buildInstallationTypeButton(
+                                label: 'Hybrid',
+                                icon: Icons.battery_charging_full_rounded,
+                                isSelected: _installationType == 'Hybrid',
+                                onTap: () {
                                   setState(() {
                                     _installationType = 'Hybrid';
                                   });
@@ -693,8 +660,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    lang.t('Monthly Bill', 'महीने का बिजली बिल'),
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    lang.t('Monthly Bill', 'मासिक बिजली बिल'),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -702,6 +669,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   TextField(
                                     controller: _billController,
                                     focusNode: _billFocus,
+                                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                                     onTap: () {
                                       if (_billController.text.trim() == '0') _billController.clear();
                                     },
@@ -709,7 +677,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                     onChanged: _onBillChanged,
                                     decoration: const InputDecoration(
                                       prefixText: '₹ ',
-                                      prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+                                      prefixStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.ink),
                                     ),
                                   ),
                                 ],
@@ -721,8 +689,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    lang.t('Solar Size (kW)', 'सोलर साइज (kW)'),
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    lang.t('Solar Size (kW)', 'सोलर क्षमता (kW)'),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -730,6 +698,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   TextField(
                                     controller: _kwController,
                                     focusNode: _kwFocus,
+                                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                                     onTap: () {
                                       if (_kwController.text.trim() == '0' || _kwController.text.trim() == '0.0') _kwController.clear();
                                     },
@@ -737,7 +706,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                     onChanged: _onKwChanged,
                                     decoration: const InputDecoration(
                                       suffixText: 'kW',
-                                      suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                                      suffixStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.muted),
                                     ),
                                   ),
                                 ],
@@ -747,27 +716,23 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 10),
 
-                        // Quick Size Presets Row
+                        // Quick Size Presets Row (1 to 6 kW)
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
                           child: Row(
                             children: [
-                              Text(
-                                '${lang.t("Quick Size", "पसंदीदा साइज")}: ',
-                                style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                              ),
-                              for (final p in [1.0, 2.0, 3.0, 5.0, 10.0, 15.0]) ...[
+                              for (final p in [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(right: 6),
                                   child: ChoiceChip(
                                     label: Text('${p.toInt()}kW'),
                                     labelStyle: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.bold,
-                                      color: kw.toInt() == p.toInt() ? AppColors.ink : AppColors.muted,
+                                      color: (kw - p).abs() < 0.05 ? AppColors.ink : AppColors.muted,
                                     ),
-                                    selected: (kw - p).abs() < 0.1,
+                                    selected: (kw - p).abs() < 0.05,
                                     selectedColor: AppColors.sun,
                                     backgroundColor: AppColors.cream,
                                     showCheckmark: false,
@@ -782,7 +747,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
                         // Turnkey Base Solar Package Banner (Live auto-calculated)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
                             color: AppColors.cream,
                             borderRadius: BorderRadius.circular(10),
@@ -795,18 +760,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    lang.t('Base Solar Package (₹70k/kW)', 'टर्नकी सोलर पैकेज (₹70,000/kW)'),
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.teal),
+                                    '${lang.t("Base Solar Package", "सोलर पैकेज")} (${_propertyType == "Commercial" ? "₹50k/kW" : "₹70k/kW"})',
+                                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.teal),
                                   ),
+                                  const SizedBox(height: 2),
                                   Text(
-                                    '${kw.toStringAsFixed(1)} kW × ₹70,000 (TopCon + Inverter + Fitting)',
-                                    style: const TextStyle(fontSize: 9.5, color: AppColors.muted),
+                                    '${kw.toStringAsFixed(1)} kW × ₹${_numFormat.format(SolarPricingConfig.getRatePerKw(_propertyType).toInt())}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w600),
                                   ),
                                 ],
                               ),
                               Text(
                                 _currencyFormat.format(basePrice),
-                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.ink),
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink),
                               ),
                             ],
                           ),
@@ -827,11 +793,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.battery_charging_full, size: 16, color: AppColors.ink),
+                                    const Icon(Icons.battery_charging_full, size: 18, color: AppColors.ink),
                                     const SizedBox(width: 6),
                                     Text(
-                                      lang.t('Battery Configuration (Hybrid)', 'हाइब्रिड बैटरी सेटअप'),
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                      lang.t('Battery Configuration', 'बैटरी सेटअप'),
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.ink),
                                     ),
                                   ],
                                 ),
@@ -842,13 +808,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   children: [
                                     Text(
                                       '${lang.t("Voltage", "वोल्टेज")}: ',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.ink),
                                     ),
                                     const SizedBox(width: 8),
                                     ChoiceChip(
                                       label: const Text('24V'),
                                       labelStyle: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                         color: _batteryVoltage == '24V' ? AppColors.white : AppColors.ink,
                                       ),
@@ -866,7 +832,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                     ChoiceChip(
                                       label: const Text('48V'),
                                       labelStyle: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.bold,
                                         color: _batteryVoltage == '48V' ? AppColors.white : AppColors.ink,
                                       ),
@@ -888,6 +854,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 TextField(
                                   controller: _batteryCostController,
                                   focusNode: _batteryCostFocus,
+                                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                                   onTap: () {
                                     if (_batteryCostController.text.trim() == '0') {
                                       _batteryCostController.clear();
@@ -895,13 +862,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   },
                                   keyboardType: TextInputType.number,
                                   decoration: InputDecoration(
-                                    labelText: lang.t('Battery Bank Price (₹)', 'बैटरी बैंक की कीमत (₹)'),
-                                    helperText: lang.t(
-                                      'Enter total battery price (Tubular or Lithium pack)',
-                                      'बैटरी बैंक की कुल कीमत दर्ज करें (ट्यूबलर या लिथियम)',
-                                    ),
+                                    labelText: lang.t('Battery Bank Price (₹)', 'बैटरी कीमत (₹)'),
+                                    labelStyle: const TextStyle(fontSize: 14),
                                     prefixText: '₹ ',
-                                    prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+                                    prefixStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.ink),
                                   ),
                                   onChanged: (_) => setState(() {}),
                                 ),
@@ -910,28 +874,23 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           ),
                         ],
 
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
 
-                        // Additional Charges & Rates
-                        Text(
-                          lang.t('Custom Rates & Balance of Plant (Optional)', 'अतिरिक्त रेट्स व खर्च (वैकल्पिक)'),
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.muted),
-                        ),
-                        const SizedBox(height: 8),
-
+                        // Additional Rates & Charges
                         Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _tariffController,
                                 focusNode: _tariffFocus,
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                                 onTap: () {
                                   if (_tariffController.text.trim() == '0' || _tariffController.text.trim() == '0.0') _tariffController.clear();
                                 },
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 decoration: InputDecoration(
-                                  labelText: lang.t('Bijli Rate (₹/unit)', 'बिजली रेट (₹/यूनिट)'),
-                                  helperText: lang.t('Power tariff', 'यूनिट दर'),
+                                  labelText: lang.t('Electricity Rate (₹/unit)', 'बिजली दर (₹/यूनिट)'),
+                                  labelStyle: const TextStyle(fontSize: 14),
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
@@ -939,15 +898,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             const SizedBox(width: 10),
                             Expanded(
                               child: TextField(
-                                controller: _installRateController,
-                                focusNode: _installRateFocus,
+                                controller: _extraCostController,
+                                focusNode: _extraCostFocus,
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                                 onTap: () {
-                                  if (_installRateController.text.trim() == '0') _installRateController.clear();
+                                  if (_extraCostController.text.trim() == '0') _extraCostController.clear();
                                 },
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
-                                  labelText: lang.t('Extra Structure (₹/kW)', 'अतिरिक्त स्ट्रक्चर (₹/kW)'),
-                                  helperText: lang.t('Special civil/high-rise', 'हाई-राइज स्ट्रक्चर'),
+                                  labelText: lang.t('Converter / Battery (₹)', 'कन्वर्टर / बैटरी (₹)'),
+                                  labelStyle: const TextStyle(fontSize: 14),
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
@@ -956,34 +916,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 10),
 
-                        TextField(
-                          controller: _extraCostController,
-                          focusNode: _extraCostFocus,
-                          onTap: () {
-                            if (_extraCostController.text.trim() == '0') _extraCostController.clear();
-                          },
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: lang.t('Extra Wiring / Protection (₹)', 'अतिरिक्त वायरिंग खर्च (₹)'),
-                            helperText: lang.t('Long distance cable run', 'लंबी दूरी की केबल आदि'),
-                          ),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                        const SizedBox(height: 10),
-
                         // Government Subsidy (Auto computed by residential rule)
                         TextField(
                           controller: _subsidyController,
                           focusNode: _subsidyFocus,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
                           onTap: () {
                             if (_subsidyController.text.trim() == '0') _subsidyController.clear();
                           },
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: lang.t('Govt Subsidy Discount (₹)', 'सरकारी सब्सिडी छूट (₹)'),
-                            helperText: _propertyType == 'Residential'
-                                ? lang.t('PM Surya Ghar: 1kW=₹40k, 2kW=₹80k, 3kW+=₹98k', 'पीएम सूर्य घर: 1kW=₹40k, 2kW=₹80k, 3kW+=₹98k')
-                                : lang.t('Commercial/Corporate/Industrial has no subsidy (₹0)', 'कमर्शियल/कॉर्पोरेट/फैक्ट्री पर कोई सब्सिडी नहीं (₹0)'),
+                            labelText: lang.t('Govt Subsidy (₹)', 'सरकारी सब्सिडी (₹)'),
+                            labelStyle: const TextStyle(fontSize: 14),
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -1118,12 +1062,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                lang.t('PAISA KAHAN LAGEGA (COST BREAKDOWN)', 'पैसा कहाँ लगेगा (खर्च का विवरण)'),
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                lang.t('COST BREAKDOWN', 'खर्च का विवरण'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink, letterSpacing: 0.5),
                               ),
                               const SizedBox(height: 8),
                               _buildPriceRow(
-                                '${lang.t("Turnkey Solar Package", "सोलर पैकेज")} (${kw.toStringAsFixed(1)} kW @ ₹70k/kW)',
+                                '${lang.t("Turnkey Solar Package", "सोलर पैकेज")} (${kw.toStringAsFixed(1)} kW @ ₹${SolarPricingConfig.getRatePerKw(_propertyType).toInt() ~/ 1000}k/kW)',
                                 _currencyFormat.format(basePrice),
                               ),
                               if (_isHybrid && bPrice > 0)
@@ -1132,19 +1076,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   _currencyFormat.format(bPrice),
                                   isGreen: true,
                                 ),
-                              if (installCost > 0)
-                                _buildPriceRow(
-                                  lang.t('Extra Structure & Fitting', 'अतिरिक्त स्ट्रक्चर खर्च'),
-                                  _currencyFormat.format(installCost),
-                                ),
                               if (otherCost > 0)
                                 _buildPriceRow(
-                                  lang.t('Extra Wiring Charges', 'अतिरिक्त वायरिंग खर्च'),
+                                  lang.t('Converter / Battery', 'कन्वर्टर / बैटरी'),
                                   _currencyFormat.format(otherCost),
                                 ),
                               const Divider(height: 14, thickness: 1, color: AppColors.ink),
                               _buildPriceRow(
-                                lang.t('Total System Cost', 'कुल खर्च (Total Price)'),
+                                lang.t('Total System Cost', 'कुल खर्च'),
                                 _currencyFormat.format(totalSystemCost),
                                 isBold: true,
                               ),
@@ -1159,15 +1098,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 children: [
                                   Flexible(
                                     child: Text(
-                                      lang.t('Final Amount To Pay:', 'आपको देना होगा:'),
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.ink),
+                                      lang.t('Final Payable Amount:', 'कुल देय राशि:'),
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.ink),
                                     ),
                                   ),
                                   FittedBox(
                                     fit: BoxFit.scaleDown,
                                     child: Text(
                                       _currencyFormat.format(finalPriceYouPay),
-                                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.ink),
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink),
                                     ),
                                   ),
                                 ],
@@ -1190,19 +1129,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      lang.t('BANK LOAN & EMI (KIST HISAAB)', 'बैंक लोन व किश्त का हिसाब'),
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                      lang.t('BANK LOAN & EMI', 'बैंक लोन व किश्त विवरण'),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink, letterSpacing: 0.5),
                                     ),
                                     Text(
                                       '$_loanTenureYears ${lang.t("Yrs @", "साल @")} $_interestRate%',
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.teal),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.teal),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
                                 _buildPriceRow(lang.t('Sanctioned Loan', 'स्वीकृत लोन रकम'), _currencyFormat.format(_loanAmount)),
                                 _buildPriceRow(
-                                  lang.t('Down Payment (Cash)', 'डाउन पेमेंट (नकद भुगतान)'),
+                                  lang.t('Down Payment', 'डाउन पेमेंट'),
                                   _currencyFormat.format((finalPriceYouPay - _loanAmount) > 0 ? (finalPriceYouPay - _loanAmount) : 0),
                                 ),
                                 _buildPriceRow(
@@ -1219,7 +1158,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 ),
                                 const Divider(height: 12, thickness: 1, color: AppColors.ink),
                                 _buildPriceRow(
-                                  lang.t('Total Cost with Loan Interest', 'ब्याज सहित कुल खर्च'),
+                                  lang.t('Total Cost with Interest', 'ब्याज सहित कुल खर्च'),
                                   _currencyFormat.format(
                                     finalPriceYouPay +
                                         (((_calculateMonthlyEmi(_loanAmount, _interestRate, _loanTenureYears) * (_loanTenureYears * 12)) - _loanAmount) > 0
@@ -1257,15 +1196,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                lang.t('CHHAT AUR BIJLI SPECS', 'छत और बिजली विवरण'),
-                                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                lang.t('ROOFTOP & POWER SPECS', 'छत व बिजली विवरण'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink, letterSpacing: 0.5),
                               ),
                               const SizedBox(height: 8),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Expanded(child: _buildSpecBox(lang.t('Daily Power', 'रोजाना बिजली'), '~${dailyUnits.round()} ${lang.t("Units", "यूनिट")}')),
-                                  Expanded(child: _buildSpecBox(lang.t('Panels', 'पैनल संख्या'), '~$autoPlates ${lang.t("TopCon (540W)", "प्लेट्स")}')),
+                                  Expanded(child: _buildSpecBox(lang.t('Panels', 'सोलर पैनल'), '~$autoPlates ${lang.t("Panels", "पैनल")}')),
                                   Expanded(child: _buildSpecBox(lang.t('Roof Area', 'छत की जगह'), '~$roofAreaSqFt ${lang.t("sq.ft.", "वर्ग फुट")}')),
                                 ],
                               ),
@@ -1285,8 +1224,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           ),
                           icon: const Icon(Icons.send_rounded, size: 20),
                           label: Text(
-                            lang.t('Save & Send', 'सेव और भेजें (Save & Send)'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            lang.t('Save & Send Quotation', 'कोटेशन सेव करें व भेजें'),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1309,19 +1248,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 3),
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(mainValue, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.ink)),
+          child: Text(mainValue, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.ink)),
         ),
         const SizedBox(height: 2),
         Text(
           sub,
-          style: TextStyle(fontSize: 9, color: AppColors.ink.withOpacity(0.7)),
+          style: TextStyle(fontSize: 11, color: AppColors.ink.withOpacity(0.75), fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1331,7 +1270,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
   Widget _buildPriceRow(String label, String value, {bool isBold = false, bool isGreen = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1339,8 +1278,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                fontSize: isBold ? 13.5 : 13.0,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
                 color: isGreen ? AppColors.teal : AppColors.ink,
               ),
               maxLines: 1,
@@ -1350,8 +1289,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
           Text(
             value,
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              fontSize: isBold ? 14.5 : 13.5,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w700,
               color: isGreen ? AppColors.teal : AppColors.ink,
             ),
           ),
@@ -1366,14 +1305,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
       children: [
         Text(
           title,
-          style: TextStyle(fontSize: 9, color: AppColors.ink.withOpacity(0.7)),
+          style: TextStyle(fontSize: 11, color: AppColors.ink.withOpacity(0.75), fontWeight: FontWeight.w600),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: 2),
+        const SizedBox(height: 3),
         Text(
           val,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.ink),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -1381,87 +1320,96 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildPropertyTypeSelector(LanguageService lang) {
-    final types = [
-      {'key': 'Residential', 'en': 'Residential', 'hi': 'Residential (आवासीय)', 'icon': Icons.home_outlined},
-      {'key': 'Commercial', 'en': 'Commercial', 'hi': 'Commercial (व्यावसायिक)', 'icon': Icons.storefront_outlined},
-      {'key': 'Corporate', 'en': 'Corporate', 'hi': 'Corporate (कॉर्पोरेट)', 'icon': Icons.business_outlined},
-      {'key': 'Industrial', 'en': 'Industrial', 'hi': 'Industrial (औद्योगिक)', 'icon': Icons.factory_outlined},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildInstallationTypeButton({
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.sun : AppColors.cream,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? AppColors.ink : AppColors.ink.withOpacity(0.2),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.sun.withOpacity(0.4),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              lang.t('Property Type', 'जगह का प्रकार'),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.ink : AppColors.muted,
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: _propertyType == 'Residential' ? AppColors.teal.withOpacity(0.12) : AppColors.muted.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                _propertyType == 'Residential'
-                    ? lang.t('Subsidy Eligible', 'सब्सिडी लागू')
-                    : lang.t('No Subsidy', 'सब्सिडी नहीं'),
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: _propertyType == 'Residential' ? AppColors.teal : AppColors.muted,
-                ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppColors.ink : AppColors.muted,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: AppColors.paper,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.creamDark, width: 1.2),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _propertyType,
-              isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.ink),
-              items: types.map((item) {
-                final key = item['key'] as String;
-                final label = lang.isHindi ? (item['hi'] as String) : (item['en'] as String);
-                final icon = item['icon'] as IconData;
-                return DropdownMenuItem<String>(
-                  value: key,
-                  child: Row(
-                    children: [
-                      Icon(icon, size: 18, color: AppColors.teal),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          label,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.ink,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: _onPropertyTypeChanged,
-            ),
+      ),
+    );
+  }
+
+  Widget _buildPropertyTypeSelector(LanguageService lang) {
+    final isResidential = _propertyType == 'Residential';
+
+    return AppCustomDropdown<String>(
+      label: 'Property Type',
+      headerTrailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isResidential ? AppColors.teal.withOpacity(0.12) : AppColors.muted.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          isResidential ? 'Subsidy Eligible' : 'No Subsidy',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.bold,
+            color: isResidential ? AppColors.teal : AppColors.muted,
           ),
         ),
+      ),
+      value: _propertyType,
+      items: const [
+        AppDropdownItem<String>(
+          value: 'Residential',
+          label: 'Residential (₹70,000/kW)',
+          icon: Icons.home_outlined,
+          subtitle: 'Eligible for Central Govt PM Surya Ghar subsidy',
+        ),
+        AppDropdownItem<String>(
+          value: 'Commercial',
+          label: 'Commercial (₹50,000/kW)',
+          icon: Icons.storefront_outlined,
+          subtitle: 'Commercial & business enterprise solar rate',
+        ),
       ],
+      onChanged: (val) {
+        _onPropertyTypeChanged(val);
+      },
     );
   }
 
@@ -1477,7 +1425,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     final totalMonths = years * 12;
     final totalRepayment = emi * totalMonths;
     final totalInterest = totalRepayment > loanAmt ? totalRepayment - loanAmt : 0.0;
-    final downPayment = (netPayable - loanAmt) > 0 ? (netPayable - loanAmt) : 0.0;
     final netMonthlyCashflow = monthlySavings - emi;
 
     return Card(
@@ -1488,15 +1435,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
           children: [
             Row(
               children: [
-                const Icon(Icons.account_balance_outlined, size: 18, color: AppColors.teal),
+                const Icon(Icons.account_balance_outlined, size: 20, color: AppColors.teal),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    lang.t('2. BANK LOAN & EASY EMI (FINANCE)', '2. सोलर बैंक लोन व आसान किश्त (EMI)'),
+                    lang.t('2. BANK LOAN & EASY EMI', '2. बैंक लोन व आसान किश्त (EMI)'),
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      letterSpacing: 1.1,
+                      letterSpacing: 0.8,
                       color: AppColors.teal,
                     ),
                     maxLines: 1,
@@ -1505,110 +1452,60 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              lang.t(
-                'Calculate solar loan EMI and monthly savings (PM Surya Ghar Loan ~5.76% p.a.):',
-                'सोलर बैंक लोन व मासिक किश्त का हिसाब निकालें (पीएम सूर्य घर लोन ~5.76% सालाना):',
-              ),
-              style: const TextStyle(fontSize: 11, color: AppColors.muted),
-            ),
             const SizedBox(height: 12),
 
             // Loan Amount Input + Quick Presets
             Text(
               lang.t('Loan Amount (₹)', 'लोन राशि (₹)'),
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _loanAmountController,
               focusNode: _loanAmountFocus,
               keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
               onTap: () {
                 if (_loanAmountController.text.trim() == '0') {
                   _loanAmountController.clear();
                 }
               },
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 prefixText: '₹ ',
-                prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
-                helperText: loanAmt > 0
-                    ? lang.t(
-                        'Down payment: ${_currencyFormat.format(downPayment)}',
-                        'डाउन पेमेंट (शुरुआती रकम): ${_currencyFormat.format(downPayment)}',
-                      )
-                    : lang.t('Enter 0 for cash payment', 'नकद भुगतान के लिए 0 रखें'),
+                prefixStyle: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.ink),
               ),
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 8),
 
-            // Quick Loan Amount Presets
+            // Quick Loan Amount Presets (100%, 80%, 70%, 60%, 50%)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
-                  Text(
-                    '${lang.t("Quick Amount", "शॉर्टकट")}: ',
-                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                  ),
-                  ChoiceChip(
-                    label: Text(lang.t('100% Loan', 'पूरा लोन')),
-                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    selected: (loanAmt - netPayable).abs() < 10 && loanAmt > 0,
-                    selectedColor: AppColors.sun,
-                    backgroundColor: AppColors.cream,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _loanAmountController.text = netPayable.round().toString();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: Text(lang.t('80% Loan', '80% लोन')),
-                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    selected: (loanAmt - (netPayable * 0.8)).abs() < 50 && loanAmt > 0,
-                    selectedColor: AppColors.sun,
-                    backgroundColor: AppColors.cream,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _loanAmountController.text = (netPayable * 0.8).round().toString();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: Text(lang.t('50% Loan', '50% लोन')),
-                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    selected: (loanAmt - (netPayable * 0.5)).abs() < 50 && loanAmt > 0,
-                    selectedColor: AppColors.sun,
-                    backgroundColor: AppColors.cream,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _loanAmountController.text = (netPayable * 0.5).round().toString();
-                      });
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  ChoiceChip(
-                    label: Text(lang.t('No Loan (Cash)', 'कोई लोन नहीं')),
-                    labelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                    selected: loanAmt <= 0,
-                    selectedColor: AppColors.coral,
-                    backgroundColor: AppColors.cream,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      setState(() {
-                        _loanAmountController.text = '0';
-                      });
-                    },
-                  ),
+                  for (final pct in [100, 80, 70, 60, 50]) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text('$pct%'),
+                        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                        selected: (loanAmt - (netPayable * (pct / 100))).abs() < 50 && loanAmt > 0,
+                        selectedColor: AppColors.sun,
+                        backgroundColor: AppColors.cream,
+                        showCheckmark: false,
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _loanAmountController.text = (netPayable * (pct / 100)).round().toString();
+                            } else {
+                              _loanAmountController.text = '0';
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1623,7 +1520,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                     children: [
                       Text(
                         lang.t('Interest Rate (% p.a.)', 'ब्याज दर (% सालाना)'),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1632,6 +1529,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         controller: _interestRateController,
                         focusNode: _interestRateFocus,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                         onTap: () {
                           if (_interestRateController.text.trim() == '0') {
                             _interestRateController.clear();
@@ -1639,7 +1537,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         },
                         decoration: const InputDecoration(
                           suffixText: '%',
-                          suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                          suffixStyle: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.muted),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -1653,7 +1551,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                     children: [
                       Text(
                         lang.t('Tenure (Years)', 'अवधि (साल)'),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -1662,6 +1560,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         controller: _loanTenureController,
                         focusNode: _loanTenureFocus,
                         keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                         onTap: () {
                           if (_loanTenureController.text.trim() == '0') {
                             _loanTenureController.clear();
@@ -1669,7 +1568,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         },
                         decoration: InputDecoration(
                           suffixText: lang.t('Yrs', 'साल'),
-                          suffixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                          suffixStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.muted),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -1680,50 +1579,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             ),
             const SizedBox(height: 8),
 
-            // Quick Chips for Interest Rate Presets & Tenure
+            // Quick Chips for Tenure (5, 10, 15 years)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
-                  Text(
-                    '${lang.t("Rate", "दर")}: ',
-                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                  ),
-                  for (final r in [5.76, 7.0, 8.5]) ...[
+                  for (final yr in [5, 10, 15]) ...[
                     Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text('$r%'),
-                        labelStyle: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: (rate - r).abs() < 0.05 ? AppColors.ink : AppColors.muted,
-                        ),
-                        selected: (rate - r).abs() < 0.05,
-                        selectedColor: AppColors.sun,
-                        backgroundColor: AppColors.cream,
-                        showCheckmark: false,
-                        onSelected: (_) {
-                          setState(() {
-                            _interestRateController.text = r.toString();
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                  const SizedBox(width: 6),
-                  Text(
-                    '${lang.t("Tenure", "साल")}: ',
-                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                  ),
-                  for (final yr in [3, 5, 7, 10]) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
                         label: Text('$yr ${lang.t("Yrs", "साल")}'),
                         labelStyle: TextStyle(
-                          fontSize: 10,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: years == yr ? AppColors.ink : AppColors.muted,
                         ),
@@ -1763,12 +1631,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             children: [
                               Text(
                                 lang.t('Monthly Bank EMI', 'हर महीने की किश्त (EMI)'),
-                                style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                                style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 '${_currencyFormat.format(emi)} / ${lang.t("mo", "महीना")}',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.teal),
+                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.teal),
                               ),
                             ],
                           ),
@@ -1782,12 +1650,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                               children: [
                                 Text(
                                   lang.t('Total Bank Interest', 'कुल बैंक ब्याज'),
-                                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                                  style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
                                   _currencyFormat.format(totalInterest),
-                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.ink),
                                 ),
                               ],
                             ),
@@ -1800,15 +1668,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          lang.t('Net Monthly Savings after EMI:', 'किश्त देने के बाद शुद्ध मासिक बचत:'),
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
+                          lang.t('Net Monthly Savings after EMI:', 'किश्त के बाद शुद्ध मासिक बचत:'),
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.ink),
                         ),
                         Text(
                           netMonthlyCashflow >= 0
                               ? '+${_currencyFormat.format(netMonthlyCashflow)}'
                               : _currencyFormat.format(netMonthlyCashflow),
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.coral,
                           ),

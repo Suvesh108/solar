@@ -311,12 +311,12 @@ class QuotationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'PAISA KAHAN LAGEGA (COST BREAKDOWN)',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: 0.5),
+                  'COST BREAKDOWN',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 8),
                 _buildPriceRow(
-                  'Turnkey Solar Package (${kw.toStringAsFixed(1)} kW @ ₹70,000/kW)',
+                  'Turnkey Solar Package (${kw.toStringAsFixed(1)} kW @ ₹${SolarPricingConfig.getRatePerKw(propertyType).toInt() ~/ 1000}k/kW)',
                   currency.format(baseSolarCost),
                 ),
                 if (isHybrid && batteryPrice > 0)
@@ -328,7 +328,7 @@ class QuotationCard extends StatelessWidget {
                 if (installCost > 0)
                   _buildPriceRow('Additional Structure / Civil Fitting', currency.format(installCost)),
                 if (inverterWiringCost > 0)
-                  _buildPriceRow('Additional Wiring & Balance of Plant', currency.format(inverterWiringCost)),
+                  _buildPriceRow('Converter / Battery Charges', currency.format(inverterWiringCost)),
                 const Divider(height: 12, thickness: 1, color: AppColors.ink),
                 _buildPriceRow('Total System Cost', currency.format(totalSystemCost), isBold: true),
                 _buildPriceRow(
@@ -354,7 +354,7 @@ class QuotationCard extends StatelessWidget {
             ),
           ),
 
-          // 6. BANK LOAN & EMI (KIST HISAAB) (If loan is selected)
+          // 6. BANK LOAN & EMI (If loan is selected)
           if (hasLoan) ...[
             const SizedBox(height: 10),
             Container(
@@ -371,23 +371,23 @@ class QuotationCard extends StatelessWidget {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.account_balance, size: 14, color: AppColors.ink),
+                          Icon(Icons.account_balance, size: 15, color: AppColors.ink),
                           SizedBox(width: 4),
                           Text(
-                            'BANK LOAN & EASY EMI (किश्त हिसाब)',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.ink),
+                            'BANK LOAN & EASY EMI',
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.ink),
                           ),
                         ],
                       ),
                       Text(
                         '$loanYears Yrs @ ${interestRate?.toStringAsFixed(2) ?? "5.76"}%',
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.teal),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.teal),
                       ),
                     ],
                   ),
                   const SizedBox(height: 6),
                   _buildPriceRow('Sanctioned Loan', currency.format(loanAmount!)),
-                  _buildPriceRow('Monthly EMI (किश्त)', '${currency.format(emiAmount!)} / month'),
+                  _buildPriceRow('Monthly EMI', '${currency.format(emiAmount!)} / month'),
                   if (downPayment != null) _buildPriceRow('Down Payment', currency.format(downPayment!)),
                   const SizedBox(height: 4),
                   Container(

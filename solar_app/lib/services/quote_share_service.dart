@@ -39,9 +39,9 @@ class QuoteShareService {
 
     final loanSection = hasLoan
         ? '''
-🏦 *BANK LOAN & EASY EMI (किश्त हिसाब):*
+🏦 *BANK LOAN & EASY EMI:*
 • Sanctioned Loan: ₹${loanAmount.round()} ($loanYears Yrs @ ${interestRate?.toStringAsFixed(2) ?? "5.76"}%)
-• Monthly EMI (किश्त): ₹${emiAmount.round()} / month
+• Monthly EMI: ₹${emiAmount.round()} / month
 • Monthly Savings: ₹${monthlySavings.round()} / month
 ${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net EMI difference: ₹${(emiAmount - monthlySavings).round()} / mo'}
 '''
@@ -56,7 +56,7 @@ ${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net 
         : '';
 
     final extraWiringLine = inverterWiringCost > 0
-        ? '• Extra Wiring & Protection: ₹${inverterWiringCost.round()}\n'
+        ? '• Converter / Battery: ₹${inverterWiringCost.round()}\n'
         : '';
 
     return '''
@@ -75,7 +75,7 @@ ${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net 
 • Monthly Generation: ~${(kw * 120).round()} Units / month
 • Rooftop Area: ~${(kw * 100).round()} sq. ft.
 ${isHybrid ? '• Battery Setup: ${batteryVoltage ?? "24V"} Solar Battery Bank\n' : ''}
-💰 *COST BREAKDOWN (HISAAB):*
+💰 *COST BREAKDOWN:*
 • Turnkey Solar Package (${kw.toStringAsFixed(1)} kW): ₹${baseSolarCost.round()}
 $batteryLine$extraFittingLine$extraWiringLine─────────────────────────
 • *Total System Cost:* ₹${totalSystemCost.round()}

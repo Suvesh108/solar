@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/app_update_service.dart';
 import '../services/language_service.dart';
-import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -16,7 +17,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = 'Sunward User';
   bool _isCheckingUpdate = false;
   String _updateStatusMessage = '';
-  UpdateInfo? _availableUpdate;
+  AppReleaseInfo? _availableUpdate;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
 
@@ -35,20 +36,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _editName() async {
-    final lang = LanguageService.instance;
     final controller = TextEditingController(text: _userName);
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.paper,
-        title: Text(
-          lang.t('Change Name', 'नाम बदलें'),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        title: const Text(
+          'Change Name',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         content: TextField(
           controller: controller,
-          decoration: InputDecoration(
-            labelText: lang.t('Your Name', 'आपका नाम'),
+          decoration: const InputDecoration(
+            labelText: 'Your Name',
             hintText: 'Enter name',
           ),
           autofocus: true,
@@ -56,12 +56,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(lang.t('Cancel', 'रद्द करें'), style: const TextStyle(color: AppColors.muted)),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.muted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.ink, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: Text(lang.t('Save', 'सेव करें')),
+            child: const Text('Save'),
           ),
         ],
       ),
@@ -75,54 +75,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _checkForUpdates() async {
-    final lang = LanguageService.instance;
     setState(() {
       _isCheckingUpdate = true;
-      _updateStatusMessage = lang.t('Checking GitHub releases for latest version...', 'नए वर्जन की जांच हो रही है...');
+      _updateStatusMessage = 'Checking GitHub releases for latest version...';
       _availableUpdate = null;
     });
 
-    final result = await UpdateService.checkForUpdate();
+    final result = await AppUpdateService.checkForUpdate();
 
     if (!mounted) return;
 
     setState(() {
       _isCheckingUpdate = false;
       switch (result.status) {
-        case UpdateCheckStatus.updateAvailable:
-          _availableUpdate = result.update;
-          _updateStatusMessage = lang.t(
-            'New version ${result.update!.version} is available!',
-            'नया वर्जन ${result.update!.version} उपलब्ध है!',
-          );
+        case AppUpdateStatus.updateAvailable:
+          _availableUpdate = result.release;
+          _updateStatusMessage = 'New version ${result.release!.version} is available!';
           break;
-        case UpdateCheckStatus.upToDate:
+        case AppUpdateStatus.upToDate:
           _availableUpdate = null;
-          _updateStatusMessage = lang.t(
-            'Great! You already have the latest version (${result.currentVersion}).',
-            'बधाई! आपके पास पहले से नवीनतम वर्जन (${result.currentVersion}) है।',
-          );
+          _updateStatusMessage = 'Great! You already have the latest version (${result.currentVersion}).';
           break;
-        case UpdateCheckStatus.error:
+        case AppUpdateStatus.error:
           _availableUpdate = null;
-          _updateStatusMessage = lang.t(
-            'Could not auto-connect to GitHub server. You can download the latest APK directly below.',
-            'सर्वर से स्वतः संपर्क नहीं हो सका। आप नीचे दिए बटन से नया APK सीधे डाउनलोड कर सकते हैं।',
-          );
+          _updateStatusMessage = result.message ?? 'Could not connect to GitHub. You can download the latest APK below.';
+          break;
+        case AppUpdateStatus.idle:
+        case AppUpdateStatus.checking:
           break;
       }
     });
   }
 
-  Future<void> _startInAppDownload(UpdateInfo update) async {
-    final lang = LanguageService.instance;
+  Future<void> _startInAppDownload(AppReleaseInfo update) async {
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;
     });
 
-    final file = await UpdateService.downloadAndInstallApk(
-      apkUrl: update.apkUrl,
+    final file = await AppUpdateService.downloadAndInstallApk(
+      apkUrl: update.apkDownloadUrl,
       onProgress: (p) {
         if (mounted) {
           setState(() => _downloadProgress = p);
@@ -134,11 +126,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isDownloading = false);
 
-    if (file == null) {
+    if (file == null && !kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           backgroundColor: AppColors.coral,
-          content: Text(lang.t('Failed to download update. Check internet connection.', 'अपडेट डाउनलोड नहीं हो सका। कृपया इंटरनेट जांचें।')),
+          content: Text('Failed to download update. Please check internet connection or use browser link.'),
         ),
       );
     }
@@ -154,10 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context, _, __) {
         return Scaffold(
           appBar: AppBar(
-            title: Text(lang.t('My Profile', 'मेरी प्रोफाइल')),
-            actions: const [
-              LanguageToggleButton(),
-            ],
+            title: const Text('My Profile'),
           ),
           body: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
@@ -233,12 +222,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    lang.t('App Updates', 'ऐप अपडेट'),
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                  const Text(
+                                    'App Updates',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
                                   ),
                                   Text(
-                                    '${lang.t("Current version", "वर्तमान वर्जन")}: ${UpdateService.currentVersion}',
+                                    'Current Version: ${AppUpdateService.currentVersion}',
                                     style: const TextStyle(fontSize: 12, color: AppColors.muted),
                                   ),
                                 ],
@@ -253,11 +242,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: _availableUpdate != null
-                                  ? AppColors.sun.withOpacity(0.2)
-                                  : AppColors.teal.withOpacity(0.1),
+                                  ? AppColors.sun.withValues(alpha: 0.2)
+                                  : AppColors.teal.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _availableUpdate != null ? AppColors.sun : AppColors.teal.withOpacity(0.3),
+                                color: _availableUpdate != null
+                                    ? AppColors.sun
+                                    : AppColors.teal.withValues(alpha: 0.3),
                               ),
                             ),
                             child: Text(
@@ -276,20 +267,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.cream.withOpacity(0.5),
+                              color: AppColors.cream.withValues(alpha: 0.5),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${lang.t("What's New in", "नया क्या है")} ${_availableUpdate!.version}:',
+                                  "What's New in ${_availableUpdate!.version}:",
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
                                   _availableUpdate!.notes,
-                                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                                  style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
                                   maxLines: 4,
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -308,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                               icon: const Icon(Icons.download_for_offline_outlined, size: 20),
                               label: Text(
-                                '${lang.t("Download & Install", "डाउनलोड और इंस्टॉल करें")} ${_availableUpdate!.version}',
+                                'Download & Install ${_availableUpdate!.version}',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               onPressed: () => _startInAppDownload(_availableUpdate!),
@@ -323,7 +314,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(lang.t('Downloading update...', 'अपडेट डाउनलोड हो रहा है...'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                  const Text('Downloading update...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                   Text('${(_downloadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                                 ],
                               ),
@@ -336,19 +327,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                lang.t(
-                                  'Package installer will trigger automatically without opening browser.',
-                                  'डाउनलोड पूरा होते ही बिना ब्राउज़र खोले सीधे इंस्टॉल होगा।',
-                                ),
-                                style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                              const Text(
+                                'Package installer will trigger automatically upon download completion.',
+                                style: TextStyle(fontSize: 11, color: AppColors.muted),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                         ],
 
-                        if (!_isDownloading && _availableUpdate == null) ...[
+                        if (!_isDownloading) ...[
                           SizedBox(
                             width: double.infinity,
                             height: 46,
@@ -366,46 +354,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     )
                                   : const Icon(Icons.refresh_rounded, size: 20),
                               label: Text(
-                                _isCheckingUpdate ? lang.t('Checking...', 'जांच जारी है...') : lang.t('Check For App Update', 'नए ऐप अपडेट की जांच करें'),
+                                _isCheckingUpdate ? 'Checking...' : 'Check For App Updates',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               onPressed: _isCheckingUpdate ? null : _checkForUpdates,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 42,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.teal,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: const Icon(Icons.download_for_offline, size: 18),
-                              label: Text(
-                                lang.t('Download & Install Internally (In-App)', 'ऐप के अंदर सीधे डाउनलोड व इंस्टॉल करें'),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () => _startInAppDownload(
-                                UpdateInfo(
-                                  version: 'Latest',
-                                  notes: 'Direct internal update without browser',
-                                  apkUrl: UpdateService.latestDirectApkUrl,
-                                  apkSize: 0,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
                           Center(
-                            child: TextButton(
+                            child: TextButton.icon(
                               style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-                              child: Text(
-                                lang.t('Open Browser Download (Fallback)', 'ब्राउज़र से डाउनलोड (वैकल्पिक)'),
-                                style: const TextStyle(fontSize: 11),
+                              icon: const Icon(Icons.open_in_browser_rounded, size: 16),
+                              label: const Text(
+                                'Open GitHub Releases (Browser)',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                               ),
-                              onPressed: () => UpdateService.openManualDownloadUrl(UpdateService.latestDirectApkUrl),
+                              onPressed: () => AppUpdateService.openUrl(
+                                _availableUpdate?.releasePageUrl ?? AppUpdateService.defaultReleasePageUrl,
+                              ),
                             ),
                           ),
                         ],

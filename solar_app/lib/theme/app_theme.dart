@@ -74,6 +74,20 @@ class AppTheme {
           side: BorderSide(color: AppColors.ink.withOpacity(0.08), width: 1),
         ),
       ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.paper,
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AppColors.creamDark, width: 1.2),
+        ),
+        textStyle: const TextStyle(
+          color: AppColors.ink,
+          fontSize: 13.5,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }

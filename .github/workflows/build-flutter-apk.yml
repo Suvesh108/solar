@@ -83,14 +83,19 @@ jobs:
         run: |
           TAG_NAME="v0.0.9"
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
-          OUT_APK1="Sunward-${TAG_NAME}.apk"
-          OUT_APK2="Sunward.apk"
-          OUT_APK3="sunward-solar-flutter-${TAG_NAME}.apk"
-          cp "$APK_PATH" "$OUT_APK1"
-          cp "$APK_PATH" "$OUT_APK2"
-          cp "$APK_PATH" "$OUT_APK3"
+          OUT_APK="Sunward.apk"
+          cp "$APK_PATH" "$OUT_APK"
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
-            gh release upload "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --clobber
-          else
-            gh release create "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME: Unified Solar Setup & Pricing, turnkey ₹70k/kW pricing, On-Grid vs Hybrid battery integration with manual pricing, and 5.76% PM Surya Ghar loan rate."
+            echo "Deleting existing release $TAG_NAME to ensure clean single-APK release..."
+            gh release delete "$TAG_NAME" -y || true
           fi
+          gh release create "$TAG_NAME" "$OUT_APK" \
+            --title "$TAG_NAME - Sunward Solar App Update" \
+            --notes "### Sunward Solar $TAG_NAME Updates
+
+- **Unified Solar Setup & Pricing**: Capacity-based turnkey pricing (Residential @ ₹70,000/kW, Commercial @ ₹50,000/kW).
+- **On-Grid vs Hybrid Selection**: Dynamic battery bank integration with manual pricing and voltage options (24V / 48V).
+- **Clean Responsive Layout**: Fixed button truncation and refined typography (14–18px bold) for effortless readability.
+- **Pure English Interface**: Simple, professional English throughout.
+- **Custom Sunward Dropdown System**: Smooth custom animated selection cards for Property Type and all selectors.
+- **Rebuilt In-App Updater**: Direct GitHub releases integration with seamless in-app download and package installation."
