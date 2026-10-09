@@ -25,49 +25,37 @@ def setup_android():
         with open(manifest_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        # Update app label to "Sunward"
-        content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward"', content)
-
-        # In-app update and internet permissions
-        required_permissions = [
-            '<uses-permission android:name="android.permission.INTERNET" />',
-            '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />',
-        ]
-        for perm in required_permissions:
-            perm_name = re.search(r'android:name="([^"]+)"', perm).group(1)
-            if perm_name not in content:
-                content = content.replace("<application", f"    {perm}\n    <application")
-
-        # Queries block for WhatsApp, tel, and web
-        queries_block = """    <queries>
+        permissions = """
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.CALL_PHONE"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <queries>
         <intent>
-            <action android:name="android.intent.action.DIAL" />
-            <data android:scheme="tel" />
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
         </intent>
         <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" />
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
         <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="whatsapp" />
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="whatsapp"/>
         </intent>
         <intent>
-            <action android:name="android.intent.action.SEND" />
-            <data android:mimeType="*/*" />
+            <action android:name="android.intent.action.SEND"/>
+            <data android:mimeType="*/*"/>
         </intent>
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
-    </queries>"""
-
-        if "<queries>" in content:
-            content = re.sub(r'<queries>.*?</queries>', queries_block, content, flags=re.DOTALL)
-        else:
-            content = content.replace("<application", queries_block + "\n    <application")
-
+    </queries>
+"""
+        content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward"', content)
+        if "<queries>" not in content:
+            content = content.replace("<application", permissions + "\n    <application")
         with open(manifest_path, "w", encoding="utf-8") as f:
             f.write(content)
-        print("Configured AndroidManifest.xml with permissions and queries.")
+        print("Configured Sunward app label and injected permissions/queries into AndroidManifest.xml.")
 
     # 3. Configure Signing in build.gradle.kts or build.gradle
     app_gradle_kts = os.path.join(android_app_dir, "build.gradle.kts")

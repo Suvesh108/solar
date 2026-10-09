@@ -45,11 +45,27 @@ jobs:
 
       - name: Analyze Flutter Code
         working-directory: solar_app
-        run: flutter analyze --no-fatal-warnings --no-fatal-infos || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! flutter analyze > analyze_log.txt 2>&1; then
+            echo "=== FLUTTER ANALYZE FAILED ==="
+            cat analyze_log.txt
+            gh release create "debug-analyze-fail" analyze_log.txt --title "Analyze Failure Log" --notes "Analyze failed" --clobber || true
+            exit 1
+          fi
 
       - name: Build Signed Release APK
         working-directory: solar_app
-        run: flutter build apk --release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! flutter build apk --release -v > build_log.txt 2>&1; then
+            echo "=== FLUTTER BUILD RELEASE FAILED ==="
+            tail -n 200 build_log.txt
+            gh release create "debug-build-fail" build_log.txt --title "Build Failure Log" --notes "Build failed" --clobber || true
+            exit 1
+          fi
 
       - name: Publish APK to GitHub Release
         env:
