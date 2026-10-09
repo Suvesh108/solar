@@ -365,8 +365,8 @@ class QuotationCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  _buildPriceRow('Sanctioned Loan', currency.format(loanAmount)),
-                  _buildPriceRow('Monthly EMI (किश्त)', '${currency.format(emiAmount)} / month'),
+                  _buildPriceRow('Sanctioned Loan', currency.format(loanAmount!)),
+                  _buildPriceRow('Monthly EMI (किश्त)', '${currency.format(emiAmount!)} / month'),
                   if (downPayment != null) _buildPriceRow('Down Payment', currency.format(downPayment!)),
                   const SizedBox(height: 4),
                   Container(
