@@ -2,15 +2,12 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class QuoteShareService {
-  static const MethodChannel _platformChannel = MethodChannel('com.sunward.solar/whatsapp');
-
   static Future<bool> openWhatsApp({
     required String phone,
     required String message,
@@ -62,26 +59,13 @@ class QuoteShareService {
     return false;
   }
 
-  /// Sends the full quotation card image DIRECTLY to the customer's WhatsApp chat
-  /// without ANY text caption (Zero text, 100% detail in the image card).
+  /// Sends the full quotation card image to WhatsApp with ZERO text caption
+  /// (100% detail in the image card).
   static Future<bool> sendQuotationCardToWhatsApp({
     required File imageFile,
     required String phone,
     required String customerName,
   }) async {
-    try {
-      if (Platform.isAndroid) {
-        final res = await _platformChannel.invokeMethod<bool>('sendImageToWhatsApp', {
-          'filePath': imageFile.path,
-          'phone': phone,
-        });
-        if (res == true) return true;
-      }
-    } catch (e) {
-      debugPrint('Native WhatsApp intent channel error: $e');
-    }
-
-    // Fallback if direct intent not available: system share sheet with ZERO text
     try {
       await Share.shareXFiles(
         [XFile(imageFile.path)],
@@ -90,7 +74,7 @@ class QuoteShareService {
       );
       return true;
     } catch (e) {
-      debugPrint('Fallback share error: $e');
+      debugPrint('Share error: $e');
       return false;
     }
   }

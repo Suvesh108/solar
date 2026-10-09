@@ -109,7 +109,7 @@ class QuotationCard extends StatelessWidget {
                       Text(
                         'OFFICIAL ROOFTOP SOLAR ESTIMATE',
                         style: TextStyle(
-                          color: AppColors.ink.withValues(alpha: 0.75),
+                          color: AppColors.ink.withOpacity(0.75),
                           fontWeight: FontWeight.bold,
                           fontSize: 10,
                           letterSpacing: 0.5,
@@ -142,7 +142,7 @@ class QuotationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
@@ -194,7 +194,7 @@ class QuotationCard extends StatelessWidget {
                     ),
                     Text(
                       '$propertyType • ${DateFormat('dd MMM yyyy').format(generatedAt)}',
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink.withValues(alpha: 0.8)),
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.ink.withOpacity(0.8)),
                     ),
                   ],
                 ),
@@ -207,7 +207,7 @@ class QuotationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.09),
+              color: Colors.black.withOpacity(0.09),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -220,7 +220,7 @@ class QuotationCard extends StatelessWidget {
                     isHighlight: true,
                   ),
                 ),
-                Container(width: 1, height: 42, color: AppColors.ink.withValues(alpha: 0.2)),
+                Container(width: 1, height: 42, color: AppColors.ink.withOpacity(0.2)),
                 Expanded(
                   child: _buildHeroStat(
                     'Yearly Savings',
@@ -228,7 +228,7 @@ class QuotationCard extends StatelessWidget {
                     '₹${numFormat.format(monthlySavings)} / mo',
                   ),
                 ),
-                Container(width: 1, height: 42, color: AppColors.ink.withValues(alpha: 0.2)),
+                Container(width: 1, height: 42, color: AppColors.ink.withOpacity(0.2)),
                 Expanded(
                   child: _buildHeroStat(
                     '25-Yr Net Profit',
@@ -245,7 +245,7 @@ class QuotationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withOpacity(0.7),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -294,7 +294,7 @@ class QuotationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Colors.white.withOpacity(0.7),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -339,7 +339,7 @@ class QuotationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
@@ -372,7 +372,7 @@ class QuotationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.teal.withValues(alpha: 0.15),
+                      color: AppColors.teal.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -403,7 +403,7 @@ class QuotationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: Colors.black.withOpacity(0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -421,7 +421,7 @@ class QuotationCard extends StatelessWidget {
                 ),
                 Text(
                   'Book Free Roof Survey',
-                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppColors.ink.withValues(alpha: 0.85)),
+                  style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: AppColors.ink.withOpacity(0.85)),
                 ),
               ],
             ),
@@ -439,7 +439,7 @@ class QuotationCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: AppColors.ink.withValues(alpha: 0.75),
+            color: AppColors.ink.withOpacity(0.75),
           ),
         ),
         const SizedBox(height: 2),
@@ -457,7 +457,7 @@ class QuotationCard extends StatelessWidget {
           style: TextStyle(
             fontSize: 9,
             fontWeight: FontWeight.bold,
-            color: isHighlight ? AppColors.teal : AppColors.ink.withValues(alpha: 0.75),
+            color: isHighlight ? AppColors.teal : AppColors.ink.withOpacity(0.75),
           ),
         ),
       ],
@@ -470,7 +470,7 @@ class QuotationCard extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 9, color: AppColors.ink.withValues(alpha: 0.65), fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 9, color: AppColors.ink.withOpacity(0.65), fontWeight: FontWeight.w600),
         ),
         Text(
           value,
@@ -511,7 +511,7 @@ class QuotationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.5),
+        color: Colors.white.withOpacity(0.5),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

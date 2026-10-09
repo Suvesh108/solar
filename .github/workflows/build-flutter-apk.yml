@@ -43,6 +43,10 @@ jobs:
         working-directory: solar_app
         run: flutter pub get
 
+      - name: Analyze Flutter Code
+        working-directory: solar_app
+        run: flutter analyze
+
       - name: Build Signed Release APK
         working-directory: solar_app
         run: flutter build apk --release

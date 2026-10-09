@@ -231,7 +231,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.sun.withValues(alpha: 0.25),
+                    color: AppColors.sun.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.sun),
                   ),
