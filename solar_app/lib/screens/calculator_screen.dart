@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:screenshot/screenshot.dart';
+import '../constants/solar_pricing_config.dart';
 import '../services/language_service.dart';
 import '../services/lead_service.dart';
 import '../services/quote_share_service.dart';
@@ -19,25 +20,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   final _screenshotController = ScreenshotController();
   final _billController = TextEditingController(text: '0');
   final _kwController = TextEditingController(text: '0');
-  
-  // Custom Rates & Hardware Plate Settings
-  final _plateCountController = TextEditingController(text: '0');
-  final _plateCostController = TextEditingController(text: '0');
+
+  // Installation Type & Battery Settings
+  String _installationType = 'On-Grid'; // 'On-Grid' or 'Hybrid'
+  String _batteryVoltage = '24V';       // '24V' or '48V'
+  final _batteryCostController = TextEditingController(text: '0');
+
+  // Custom Rates & Balance of Plant
   final _tariffController = TextEditingController(text: '7');       // ₹7/unit
-  final _installRateController = TextEditingController(text: '0');
-  final _extraCostController = TextEditingController(text: '0');
+  final _installRateController = TextEditingController(text: '0');  // Optional extra fitting ₹/kW
+  final _extraCostController = TextEditingController(text: '0');    // Optional extra wiring ₹
   final _subsidyController = TextEditingController(text: '0');
 
-  // Bank Loan & EMI Settings
+  // Bank Loan & EMI Settings (Default 5.76% p.a. PM Surya Ghar concessional rate)
   final _loanAmountController = TextEditingController(text: '0');
-  final _interestRateController = TextEditingController(text: '8.5'); // 8.5% p.a.
+  final _interestRateController = TextEditingController(text: '5.76');
   final _loanTenureController = TextEditingController(text: '5');      // 5 years
 
   // Auto-zero focus nodes (clears '0' on click, restores '0' when left empty)
   final _billFocus = FocusNode();
   final _kwFocus = FocusNode();
-  final _plateCountFocus = FocusNode();
-  final _plateCostFocus = FocusNode();
+  final _batteryCostFocus = FocusNode();
   final _tariffFocus = FocusNode();
   final _installRateFocus = FocusNode();
   final _extraCostFocus = FocusNode();
@@ -47,13 +50,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   final _loanTenureFocus = FocusNode();
 
   String _propertyType = 'Residential';
-  final GlobalKey _quotationBoundaryKey = GlobalKey();
 
   final _currencyFormat = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
   final _numFormat = NumberFormat('#,##,###', 'en_IN');
-
-  static const int unitsPerKwMonth = 120; // 4 units/kW/day * 30 days
-  static const int plateWattage = 540;   // 540W Mono PERC TopCon plates
 
   @override
   void initState() {
@@ -65,8 +64,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
       _recalculateSubsidy(_kw, _propertyType);
       setState(() {});
     });
-    _setupAutoZero(_plateCountController, _plateCountFocus, () => setState(() {}));
-    _setupAutoZero(_plateCostController, _plateCostFocus, () => setState(() {}));
+    _setupAutoZero(_batteryCostController, _batteryCostFocus, () => setState(() {}));
     _setupAutoZero(_tariffController, _tariffFocus, () => setState(() {}));
     _setupAutoZero(_installRateController, _installRateFocus, () => setState(() {}));
     _setupAutoZero(_extraCostController, _extraCostFocus, () => setState(() {}));
@@ -99,8 +97,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   void dispose() {
     _billController.dispose();
     _kwController.dispose();
-    _plateCountController.dispose();
-    _plateCostController.dispose();
+    _batteryCostController.dispose();
     _tariffController.dispose();
     _installRateController.dispose();
     _extraCostController.dispose();
@@ -111,8 +108,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
     _billFocus.dispose();
     _kwFocus.dispose();
-    _plateCountFocus.dispose();
-    _plateCostFocus.dispose();
+    _batteryCostFocus.dispose();
     _tariffFocus.dispose();
     _installRateFocus.dispose();
     _extraCostFocus.dispose();
@@ -128,14 +124,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     setState(() {
       _billController.text = '0';
       _kwController.text = '0';
-      _plateCountController.text = '0';
-      _plateCostController.text = '0';
+      _installationType = 'On-Grid';
+      _batteryVoltage = '24V';
+      _batteryCostController.text = '0';
       _tariffController.text = '7';
       _installRateController.text = '0';
       _extraCostController.text = '0';
       _subsidyController.text = '0';
       _loanAmountController.text = '0';
-      _interestRateController.text = '8.5';
+      _interestRateController.text = '5.76';
       _loanTenureController.text = '5';
       _propertyType = 'Residential';
     });
@@ -143,8 +140,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
 
   double get _bill => double.tryParse(_billController.text) ?? 0;
   double get _kw => double.tryParse(_kwController.text) ?? 0;
-  int get _plateCount => int.tryParse(_plateCountController.text) ?? 0;
-  double get _plateCost => double.tryParse(_plateCostController.text) ?? 0;
+  bool get _isHybrid => _installationType == 'Hybrid';
+  double get _batteryPrice => _isHybrid ? (double.tryParse(_batteryCostController.text) ?? 0.0) : 0.0;
+  double get _baseSolarPrice => SolarPricingConfig.calculateBasePrice(_kw);
   double get _tariff {
     final t = double.tryParse(_tariffController.text) ?? 7;
     return t > 0 ? t : 7;
@@ -154,11 +152,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   double get _subsidy => double.tryParse(_subsidyController.text) ?? 0;
 
   double get _loanAmount => double.tryParse(_loanAmountController.text) ?? 0;
-  double get _interestRate => double.tryParse(_interestRateController.text) ?? 8.5;
+  double get _interestRate => double.tryParse(_interestRateController.text) ?? 5.76;
   int get _loanTenureYears {
     final y = int.tryParse(_loanTenureController.text) ?? 5;
     return y > 0 ? y : 1;
   }
+  int get _autoPlateCount => SolarPricingConfig.calculatePlateCount(_kw);
 
   double _calculateMonthlyEmi(double principal, double annualRate, int years) {
     if (principal <= 0 || years <= 0) return 0.0;
@@ -202,10 +201,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     });
   }
 
-  void _onPlateCountChanged(String val) {
-    setState(() {});
-  }
-
   void _onPropertyTypeChanged(String? val) {
     if (val == null) return;
     setState(() {
@@ -227,15 +222,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     final locationCtrl = TextEditingController();
 
     final kw = _kw;
-    final pCount = _plateCount;
-    final pCost = _plateCost;
-    final totalPlatesCost = pCount * pCost;
+    final basePrice = _baseSolarPrice;
+    final bPrice = _batteryPrice;
     final installCost = kw * _installRate;
     final extraCost = _extraCost;
-    final totalSystemCost = totalPlatesCost + installCost + extraCost;
+    final totalSystemCost = basePrice + bPrice + installCost + extraCost;
     final sub = _subsidy;
     final netPayable = (totalSystemCost - sub) > 0 ? (totalSystemCost - sub) : 0.0;
-    final monthlySavings = kw * unitsPerKwMonth * _tariff;
+    final monthlySavings = kw * SolarPricingConfig.unitsPerKwMonth * _tariff;
     final annualSavings = monthlySavings * 12;
     final payback = annualSavings > 0 ? (netPayable / annualSavings).toStringAsFixed(1) : '0';
     final profit25 = (annualSavings * 25) - netPayable;
@@ -261,247 +255,117 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             top: 20,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        lang.t('Customer Quotation & Booking', 'ग्राहक कोटेशन व बुकिंग'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    lang.t('Customer Quotation', 'ग्राहक कोटेशन व विवरण'),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                lang.t(
+                  'Enter customer details to generate self-contained quotation card and send to WhatsApp:',
+                  'ग्राहक का नाम व नंबर दर्ज करें और व्हाट्सऐप पर पूरा कार्ड भेजें:',
                 ),
-                const SizedBox(height: 10),
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+              const SizedBox(height: 14),
 
-                // Quick Summary Banner
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.sun.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.sun),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${kw.toStringAsFixed(1)} kW • $_propertyType',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.ink),
-                          ),
-                          Text(
-                            'Savings: ₹${_numFormat.format(annualSavings)}/yr',
-                            style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                          ),
-                        ],
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            _currencyFormat.format(netPayable),
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.ink),
-                          ),
-                          Text(
-                            sub > 0 ? 'Subsidy: -${_currencyFormat.format(sub)}' : 'No Subsidy',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: sub > 0 ? const Color(0xFF0F5132) : AppColors.muted),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: lang.t('Customer Full Name *', 'ग्राहक का नाम *'),
+                  hintText: 'e.g. Ramesh Patel',
+                  prefixIcon: const Icon(Icons.person_outline),
                 ),
-                const SizedBox(height: 14),
-
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: lang.t('Customer Name *', 'ग्राहक का नाम *'),
-                    hintText: 'e.g. Ramesh Kulkarni',
-                    prefixIcon: const Icon(Icons.person_outline),
-                  ),
-                  onChanged: (_) => setModalState(() {}),
+                onChanged: (_) => setModalState(() {}),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: InputDecoration(
+                  labelText: lang.t('Mobile / WhatsApp Number *', 'मोबाइल / व्हाट्सऐप नंबर *'),
+                  hintText: 'e.g. 9822012345',
+                  prefixIcon: const Icon(Icons.phone_outlined),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    labelText: lang.t('Mobile / WhatsApp Number *', 'मोबाइल / व्हाट्सऐप नंबर *'),
-                    hintText: 'e.g. 9822012345',
-                    prefixIcon: const Icon(Icons.phone_outlined),
-                  ),
-                  onChanged: (_) => setModalState(() {}),
+                onChanged: (_) => setModalState(() {}),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: locationCtrl,
+                decoration: InputDecoration(
+                  labelText: lang.t('Location / City *', 'शहर / इलाका *'),
+                  hintText: 'e.g. Pune, Maharashtra',
+                  prefixIcon: const Icon(Icons.location_on_outlined),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: locationCtrl,
-                  decoration: InputDecoration(
-                    labelText: lang.t('Location / City *', 'शहर / इलाका *'),
-                    hintText: 'e.g. Pune, Maharashtra',
-                    prefixIcon: const Icon(Icons.location_on_outlined),
-                  ),
-                  onChanged: (_) => setModalState(() {}),
+                onChanged: (_) => setModalState(() {}),
+              ),
+              const SizedBox(height: 16),
+
+              // Primary Action: Save Lead & Send Full WhatsApp Card (100% details, ZERO text)
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366), // WhatsApp brand green
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 3,
                 ),
-                const SizedBox(height: 16),
+                icon: const Icon(Icons.share, size: 20),
+                label: Text(
+                  lang.t('Save & Send Card to WhatsApp', 'कार्ड सेव करें व व्हाट्सऐप पर भेजें'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final phone = phoneCtrl.text.trim();
+                  final loc = locationCtrl.text.trim();
 
-                // Primary Action: Save Lead & Send Full WhatsApp Card (100% details, ZERO text)
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366), // WhatsApp brand green
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 3,
-                  ),
-                  icon: const Icon(Icons.share, size: 20),
-                  label: Text(
-                    lang.t('Save & Send Card to WhatsApp', 'कार्ड सेव करें व व्हाट्सऐप पर भेजें'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  onPressed: () async {
-                    final name = nameCtrl.text.trim();
-                    final phone = phoneCtrl.text.trim();
-                    final loc = locationCtrl.text.trim();
-
-                    if (name.isEmpty || phone.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
-                      );
-                      return;
-                    }
-
-                    // 1. Save Lead locally
-                    await LeadService.instance.addLead(
-                      name: name,
-                      phone: phone,
-                      location: loc.isEmpty ? 'Direct' : loc,
-                      monthlyBill: _bill.toInt().toString(),
-                      propertyType: _propertyType,
+                  if (name.isEmpty || phone.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
                     );
+                    return;
+                  }
 
-                    // 2. Close input modal
-                    if (!mounted) return;
-                    Navigator.pop(ctx);
+                  // 1. Save Lead locally
+                  await LeadService.instance.addLead(
+                    name: name,
+                    phone: phone,
+                    location: loc.isEmpty ? 'Direct' : loc,
+                    monthlyBill: _bill.toInt().toString(),
+                    propertyType: _propertyType,
+                  );
 
-                    // 3. Build Full Unclipped Quotation Card
-                    final cardWidget = Material(
-                      color: Colors.transparent,
-                      child: QuotationCard(
-                        customerName: name,
-                        customerPhone: phone,
-                        customerLocation: loc.isEmpty ? 'Direct Consultation' : loc,
-                        propertyType: _propertyType,
-                        kw: kw,
-                        plateCount: pCount,
-                        platePrice: pCost,
-                        totalPlatesCost: totalPlatesCost,
-                        installCost: installCost,
-                        inverterWiringCost: extraCost,
-                        totalSystemCost: totalSystemCost,
-                        subsidy: sub,
-                        netPayable: netPayable,
-                        monthlySavings: monthlySavings,
-                        annualSavings: annualSavings,
-                        paybackYears: payback,
-                        profit25Years: profit25,
-                        loanAmount: loanAmt > 0 ? loanAmt : null,
-                        emiAmount: loanAmt > 0 ? emi : null,
-                        loanYears: loanAmt > 0 ? years : null,
-                        interestRate: loanAmt > 0 ? rate : null,
-                        downPayment: loanAmt > 0 ? downPayment : null,
-                        generatedAt: DateTime.now(),
-                      ),
-                    );
+                  // 2. Close input modal
+                  if (!mounted) return;
+                  Navigator.pop(ctx);
 
-                    // 4. Capture high-res unclipped image
-                    final file = await QuoteShareService.captureWidgetWithController(
-                      controller: _screenshotController,
-                      widget: cardWidget,
-                      context: context,
-                    );
-
-                    // 5. Send directly to customer's WhatsApp chat with ZERO text caption
-                    if (file != null) {
-                      await QuoteShareService.sendQuotationCardToWhatsApp(
-                        imageFile: file,
-                        phone: phone,
-                        customerName: name,
-                      );
-                    }
-
-                    // 6. Reset calculator to 0
-                    if (mounted) {
-                      _resetCalculator();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppColors.teal,
-                          content: Text(lang.t('Quotation card sent to WhatsApp & Lead saved!', 'कोटेशन कार्ड व्हाट्सऐप पर भेजा गया व लीड सेव हो गई!')),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-
-                // Secondary Action: Send WhatsApp Text Direct Chat
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.ink,
-                    side: const BorderSide(color: AppColors.ink, width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: Text(
-                    lang.t('Send Text Only via WhatsApp', 'सिर्फ टेक्स्ट व्हाट्सऐप पर भेजें'),
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                  onPressed: () async {
-                    final name = nameCtrl.text.trim();
-                    final phone = phoneCtrl.text.trim();
-                    final loc = locationCtrl.text.trim();
-
-                    if (name.isEmpty || phone.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
-                      );
-                      return;
-                    }
-
-                    await LeadService.instance.addLead(
-                      name: name,
-                      phone: phone,
-                      location: loc.isEmpty ? 'Direct' : loc,
-                      monthlyBill: _bill.toInt().toString(),
-                      propertyType: _propertyType,
-                    );
-
-                    final quoteMsg = QuoteShareService.formatWhatsAppQuote(
+                  // 3. Build Full Unclipped Quotation Card
+                  final cardWidget = Material(
+                    color: Colors.transparent,
+                    child: QuotationCard(
                       customerName: name,
-                      phone: phone,
-                      location: loc.isEmpty ? 'Direct' : loc,
+                      customerPhone: phone,
+                      customerLocation: loc.isEmpty ? 'Direct Consultation' : loc,
                       propertyType: _propertyType,
                       kw: kw,
-                      plateCount: pCount,
-                      platePrice: pCost,
-                      totalPlatesCost: totalPlatesCost,
+                      installationType: _installationType,
+                      batteryVoltage: _isHybrid ? _batteryVoltage : null,
+                      batteryPrice: bPrice,
+                      baseSolarCost: basePrice,
                       installCost: installCost,
                       inverterWiringCost: extraCost,
                       totalSystemCost: totalSystemCost,
@@ -514,58 +378,149 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       loanAmount: loanAmt > 0 ? loanAmt : null,
                       emiAmount: loanAmt > 0 ? emi : null,
                       loanYears: loanAmt > 0 ? years : null,
-                    );
+                      interestRate: loanAmt > 0 ? rate : null,
+                      downPayment: loanAmt > 0 ? downPayment : null,
+                      generatedAt: DateTime.now(),
+                    ),
+                  );
 
-                    if (mounted) {
-                      Navigator.pop(ctx);
-                      _resetCalculator();
-                    }
+                  // 4. Capture high-res unclipped image
+                  final file = await QuoteShareService.captureWidgetWithController(
+                    controller: _screenshotController,
+                    widget: cardWidget,
+                    context: context,
+                  );
 
-                    await QuoteShareService.openWhatsApp(phone: phone, message: quoteMsg);
-                  },
-                ),
-                const SizedBox(height: 6),
-
-                // Tertiary Action: Save Only to Leads Tab
-                TextButton(
-                  onPressed: () async {
-                    final name = nameCtrl.text.trim();
-                    final phone = phoneCtrl.text.trim();
-                    final loc = locationCtrl.text.trim();
-
-                    if (name.isEmpty || phone.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
-                      );
-                      return;
-                    }
-
-                    await LeadService.instance.addLead(
-                      name: name,
+                  // 5. Send directly to customer's WhatsApp chat with ZERO text caption
+                  if (file != null) {
+                    await QuoteShareService.sendQuotationCardToWhatsApp(
+                      imageFile: file,
                       phone: phone,
-                      location: loc.isEmpty ? 'Direct' : loc,
-                      monthlyBill: _bill.toInt().toString(),
-                      propertyType: _propertyType,
+                      customerName: name,
                     );
+                  }
 
-                    if (mounted) {
-                      Navigator.pop(ctx);
-                      _resetCalculator();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          backgroundColor: AppColors.teal,
-                          content: Text(lang.t('Lead saved to Leads tab! Calculator reset to 0.', 'लीड सेव हो गई! कैलकुलेटर 0 पर रीसेट हो गया।')),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    lang.t('Save Only to Leads Tab', 'सिर्फ लीड्स टैब में सेव करें'),
-                    style: const TextStyle(color: AppColors.muted, fontSize: 12),
-                  ),
+                  // 6. Reset calculator to 0
+                  if (mounted) {
+                    _resetCalculator();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: AppColors.teal,
+                        content: Text(lang.t('Quotation card sent to WhatsApp & Lead saved!', 'कोटेशन कार्ड व्हाट्सऐप पर भेजा गया व लीड सेव हो गई!')),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+
+              // Secondary Action: Send WhatsApp Text Direct Chat
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.ink,
+                  side: const BorderSide(color: AppColors.ink, width: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-              ],
-            ),
+                icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                label: Text(
+                  lang.t('Send Text Only via WhatsApp', 'सिर्फ टेक्स्ट व्हाट्सऐप पर भेजें'),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final phone = phoneCtrl.text.trim();
+                  final loc = locationCtrl.text.trim();
+
+                  if (name.isEmpty || phone.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                    );
+                    return;
+                  }
+
+                  await LeadService.instance.addLead(
+                    name: name,
+                    phone: phone,
+                    location: loc.isEmpty ? 'Direct' : loc,
+                    monthlyBill: _bill.toInt().toString(),
+                    propertyType: _propertyType,
+                  );
+
+                  final quoteMsg = QuoteShareService.formatWhatsAppQuote(
+                    customerName: name,
+                    phone: phone,
+                    location: loc.isEmpty ? 'Direct' : loc,
+                    propertyType: _propertyType,
+                    kw: kw,
+                    installationType: _installationType,
+                    batteryVoltage: _isHybrid ? _batteryVoltage : null,
+                    batteryPrice: bPrice,
+                    baseSolarCost: basePrice,
+                    installCost: installCost,
+                    inverterWiringCost: extraCost,
+                    totalSystemCost: totalSystemCost,
+                    subsidy: sub,
+                    netPayable: netPayable,
+                    monthlySavings: monthlySavings,
+                    annualSavings: annualSavings,
+                    paybackYears: payback,
+                    profit25Years: profit25,
+                    loanAmount: loanAmt > 0 ? loanAmt : null,
+                    emiAmount: loanAmt > 0 ? emi : null,
+                    loanYears: loanAmt > 0 ? years : null,
+                    interestRate: loanAmt > 0 ? rate : null,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _resetCalculator();
+                  }
+
+                  await QuoteShareService.openWhatsApp(phone: phone, message: quoteMsg);
+                },
+              ),
+              const SizedBox(height: 6),
+
+              // Tertiary Action: Save Only to Leads Tab
+              TextButton(
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  final phone = phoneCtrl.text.trim();
+                  final loc = locationCtrl.text.trim();
+
+                  if (name.isEmpty || phone.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(lang.t('Please enter name and phone number', 'कृपया नाम और फोन नंबर दर्ज करें'))),
+                    );
+                    return;
+                  }
+
+                  await LeadService.instance.addLead(
+                    name: name,
+                    phone: phone,
+                    location: loc.isEmpty ? 'Direct' : loc,
+                    monthlyBill: _bill.toInt().toString(),
+                    propertyType: _propertyType,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(ctx);
+                    _resetCalculator();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        backgroundColor: AppColors.teal,
+                        content: Text(lang.t('Lead saved to Leads tab! Calculator reset to 0.', 'लीड सेव हो गई! कैलकुलेटर 0 पर रीसेट हो गया।')),
+                      ),
+                    );
+                  }
+                },
+                child: Text(
+                  lang.t('Save Only to Leads Tab', 'सिर्फ लीड्स टैब में सेव करें'),
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -579,18 +534,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     final hasKw = kw > 0;
     final safeTariff = _tariff;
 
-    // Financial Calculation with Solar Plate Counts
-    final pCount = _plateCount;
-    final pCost = _plateCost;
-    final totalPlatesCost = pCount * pCost;
+    // Financial Calculation with Capacity-based Pricing
+    final basePrice = _baseSolarPrice;
+    final bPrice = _batteryPrice;
     final installCost = kw * _installRate;
     final otherCost = _extraCost;
-    final totalSystemCost = totalPlatesCost + installCost + otherCost;
+    final totalSystemCost = basePrice + bPrice + installCost + otherCost;
     final effectiveSubsidy = hasKw ? _subsidy : 0.0;
     final finalPriceYouPay = (totalSystemCost - effectiveSubsidy) > 0 ? (totalSystemCost - effectiveSubsidy) : 0.0;
 
-    final dailyUnits = kw * 4;
-    final monthlyUnits = kw * unitsPerKwMonth;
+    final dailyUnits = kw * SolarPricingConfig.dailyUnitsPerKw;
+    final monthlyUnits = kw * SolarPricingConfig.unitsPerKwMonth;
     final annualUnits = monthlyUnits * 12;
     final monthlySavings = monthlyUnits * safeTariff;
     final annualSavings = annualUnits * safeTariff;
@@ -600,7 +554,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
         : '0';
     final lifetimeProfit = hasKw ? ((annualSavings * 25) - finalPriceYouPay) : 0.0;
 
-    final roofAreaSqFt = (kw * 100).round();
+    final roofAreaSqFt = (kw * SolarPricingConfig.sqFtPerKw).round();
+    final autoPlates = _autoPlateCount;
 
     return ValueListenableBuilder<AppLanguage>(
       valueListenable: lang.languageNotifier,
@@ -637,23 +592,100 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // STEP 1: Basic Electricity Usage Inputs Card
+                // UNIFIED STEP 1: Solar Setup & Pricing (Merged Section A + Section B)
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.solar_power_outlined, size: 20, color: AppColors.teal),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                lang.t('1. SOLAR SETUP & PRICING', '1. सोलर सेटअप व कीमत'),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.1,
+                                  color: AppColors.teal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
                         Text(
-                          lang.t('1. BASIC USAGE / BIJLI CONSUMPTION', '1. बिजली का बिल और साइज चुनें'),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
-                            color: AppColors.muted,
+                          lang.t(
+                            'Choose plant type, property, and solar capacity (Turnkey @ ₹70,000/kW):',
+                            'सोलर प्रकार, जगह व प्लांट साइज चुनें (टर्नकी रेट ₹70,000/kW):',
                           ),
+                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Installation Type Selector: On-Grid vs Hybrid
+                        Text(
+                          lang.t('Installation Type', 'सोलर प्लांट प्रकार'),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                avatar: const Icon(Icons.wb_sunny_outlined, size: 16),
+                                label: Text(lang.t('On-Grid (Net Meter)', 'ऑन-ग्रिड (नेट मीटर)')),
+                                labelStyle: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: _installationType == 'On-Grid' ? AppColors.ink : AppColors.muted,
+                                ),
+                                selected: _installationType == 'On-Grid',
+                                selectedColor: AppColors.sun,
+                                backgroundColor: AppColors.cream,
+                                showCheckmark: false,
+                                onSelected: (_) {
+                                  setState(() {
+                                    _installationType = 'On-Grid';
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ChoiceChip(
+                                avatar: const Icon(Icons.battery_charging_full, size: 16),
+                                label: Text(lang.t('Hybrid (With Battery)', 'हाइब्रिड (बैटरी सहित)')),
+                                labelStyle: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: _installationType == 'Hybrid' ? AppColors.ink : AppColors.muted,
+                                ),
+                                selected: _installationType == 'Hybrid',
+                                selectedColor: AppColors.sun,
+                                backgroundColor: AppColors.cream,
+                                showCheckmark: false,
+                                onSelected: (_) {
+                                  setState(() {
+                                    _installationType = 'Hybrid';
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
+
+                        // Property Type Dropdown
+                        _buildPropertyTypeSelector(lang),
+                        const SizedBox(height: 12),
+
+                        // Electricity Bill & Solar Capacity Row
                         Row(
                           children: [
                             Expanded(
@@ -715,7 +747,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 10),
 
-                        // Quick presets row
+                        // Quick Size Presets Row
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
@@ -748,89 +780,145 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 12),
 
-                        // Property Type Dropdown (Custom UI showing only Residential, Commercial, Corporate, Industrial)
-                        _buildPropertyTypeSelector(lang),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // STEP 2: Custom Rates & Solar Plates (Always Visible)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.tune_rounded, size: 18, color: AppColors.teal),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                lang.t('2. SOLAR PLATES & CUSTOM RATES', '2. सोलर प्लेट्स व रेट्स सेटिंग'),
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.1,
-                                  color: AppColors.teal,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          lang.t(
-                            'Enter plate count & price per plate manually to customize your exact hisaab:',
-                            'प्लेट संख्या व रेट दर्ज करके अपना सटीक हिसाब बनाएं:',
+                        // Turnkey Base Solar Package Banner (Live auto-calculated)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: AppColors.cream,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppColors.teal.withOpacity(0.35), width: 1.2),
                           ),
-                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Solar Plates Row: Number of Plates & Cost per Plate
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _plateCountController,
-                                focusNode: _plateCountFocus,
-                                onTap: () {
-                                  if (_plateCountController.text.trim() == '0') _plateCountController.clear();
-                                },
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: lang.t('No. of Solar Plates', 'सोलर प्लेट्स संख्या'),
-                                  helperText: lang.t('540W Mono PERC', '540W प्लेट्स'),
-                                ),
-                                onChanged: _onPlateCountChanged,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    lang.t('Base Solar Package (₹70k/kW)', 'टर्नकी सोलर पैकेज (₹70,000/kW)'),
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.teal),
+                                  ),
+                                  Text(
+                                    '${kw.toStringAsFixed(1)} kW × ₹70,000 (TopCon + Inverter + Fitting)',
+                                    style: const TextStyle(fontSize: 9.5, color: AppColors.muted),
+                                  ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: TextField(
-                                controller: _plateCostController,
-                                focusNode: _plateCostFocus,
-                                onTap: () {
-                                  if (_plateCostController.text.trim() == '0') _plateCostController.clear();
-                                },
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  labelText: lang.t('Price / Plate (₹)', '1 प्लेट की कीमत (₹)'),
-                                  helperText: lang.t('Hardware price', 'प्रति प्लेट रेट'),
-                                ),
-                                onChanged: (_) => setState(() {}),
+                              Text(
+                                _currencyFormat.format(basePrice),
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.ink),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 10),
 
-                        // Electricity Tariff & Fitting / Labour Rate
+                        // HYBRID ONLY: Dedicated Battery Configuration Card
+                        if (_isHybrid) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.sun.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.sun, width: 1.5),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.battery_charging_full, size: 16, color: AppColors.ink),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      lang.t('Battery Configuration (Hybrid)', 'हाइब्रिड बैटरी सेटअप'),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+
+                                // Voltage Selection Chips (24V vs 48V)
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${lang.t("Voltage", "वोल्टेज")}: ',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ChoiceChip(
+                                      label: const Text('24V'),
+                                      labelStyle: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _batteryVoltage == '24V' ? AppColors.white : AppColors.ink,
+                                      ),
+                                      selected: _batteryVoltage == '24V',
+                                      selectedColor: AppColors.ink,
+                                      backgroundColor: AppColors.cream,
+                                      showCheckmark: false,
+                                      onSelected: (_) {
+                                        setState(() {
+                                          _batteryVoltage = '24V';
+                                        });
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ChoiceChip(
+                                      label: const Text('48V'),
+                                      labelStyle: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _batteryVoltage == '48V' ? AppColors.white : AppColors.ink,
+                                      ),
+                                      selected: _batteryVoltage == '48V',
+                                      selectedColor: AppColors.ink,
+                                      backgroundColor: AppColors.cream,
+                                      showCheckmark: false,
+                                      onSelected: (_) {
+                                        setState(() {
+                                          _batteryVoltage = '48V';
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+
+                                // Battery Price Input Field (Manual Entry)
+                                TextField(
+                                  controller: _batteryCostController,
+                                  focusNode: _batteryCostFocus,
+                                  onTap: () {
+                                    if (_batteryCostController.text.trim() == '0') {
+                                      _batteryCostController.clear();
+                                    }
+                                  },
+                                  keyboardType: TextInputType.number,
+                                  decoration: InputDecoration(
+                                    labelText: lang.t('Battery Bank Price (₹)', 'बैटरी बैंक की कीमत (₹)'),
+                                    helperText: lang.t(
+                                      'Enter total battery price (Tubular or Lithium pack)',
+                                      'बैटरी बैंक की कुल कीमत दर्ज करें (ट्यूबलर या लिथियम)',
+                                    ),
+                                    prefixText: '₹ ',
+                                    prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+
+                        const SizedBox(height: 14),
+
+                        // Additional Charges & Rates
+                        Text(
+                          lang.t('Custom Rates & Balance of Plant (Optional)', 'अतिरिक्त रेट्स व खर्च (वैकल्पिक)'),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.muted),
+                        ),
+                        const SizedBox(height: 8),
+
                         Row(
                           children: [
                             Expanded(
@@ -858,8 +946,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 },
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
-                                  labelText: lang.t('Fitting / Labour (₹/kW)', 'फिटिंग व स्ट्रक्चर (₹/kW)'),
-                                  helperText: lang.t('Installation cost', 'लेबर व स्ट्रक्चर'),
+                                  labelText: lang.t('Extra Structure (₹/kW)', 'अतिरिक्त स्ट्रक्चर (₹/kW)'),
+                                  helperText: lang.t('Special civil/high-rise', 'हाई-राइज स्ट्रक्चर'),
                                 ),
                                 onChanged: (_) => setState(() {}),
                               ),
@@ -868,7 +956,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 10),
 
-                        // Inverter & Wiring Extra Charges
                         TextField(
                           controller: _extraCostController,
                           focusNode: _extraCostFocus,
@@ -877,8 +964,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                           },
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
-                            labelText: lang.t('Inverter & Wiring Charges (₹)', 'इन्वर्टर और वायरिंग खर्च (₹)'),
-                            helperText: lang.t('Lumpsum balance of plant', 'अन्य सामान खर्च'),
+                            labelText: lang.t('Extra Wiring / Protection (₹)', 'अतिरिक्त वायरिंग खर्च (₹)'),
+                            helperText: lang.t('Long distance cable run', 'लंबी दूरी की केबल आदि'),
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -906,11 +993,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 ),
                 const SizedBox(height: 14),
 
-                // STEP 3: Solar Bank Loan & Easy EMI Card
+                // STEP 2: Solar Bank Loan & Easy EMI Card
                 _buildBankLoanCard(lang, finalPriceYouPay, monthlySavings),
                 const SizedBox(height: 14),
 
-                // STEP 4: Enhanced Solar Estimate Box (Animated with common words)
+                // STEP 3: Enhanced Solar Estimate Box (Summary Hisaab)
                 TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0.95, end: 1.0),
                   duration: const Duration(milliseconds: 300),
@@ -943,7 +1030,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    lang.t('4. TOTAL CALCULATION ESTIMATE', '4. आपका पूरा हिसाब-किताब'),
+                                    lang.t('TOTAL CALCULATION ESTIMATE', 'आपका पूरा हिसाब-किताब'),
                                     style: const TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
@@ -952,9 +1039,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                     ),
                                   ),
                                   Text(
-                                    '${kw.toStringAsFixed(1)} kW Solar System',
+                                    _isHybrid
+                                        ? '${kw.toStringAsFixed(1)} kW Hybrid ($_batteryVoltage)'
+                                        : '${kw.toStringAsFixed(1)} kW On-Grid Solar',
                                     style: const TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 17,
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.ink,
                                     ),
@@ -981,7 +1070,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         ),
                         const SizedBox(height: 14),
 
-                        // Three Main Hero Numbers (Fitted to prevent overflow)
+                        // Three Main Hero Numbers
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                           decoration: BoxDecoration(
@@ -1034,17 +1123,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                               ),
                               const SizedBox(height: 8),
                               _buildPriceRow(
-                                '${lang.t("Solar Plates", "सोलर प्लेट्स")} ($pCount × ₹${pCost.round()})',
-                                _currencyFormat.format(totalPlatesCost),
+                                '${lang.t("Turnkey Solar Package", "सोलर पैकेज")} (${kw.toStringAsFixed(1)} kW @ ₹70k/kW)',
+                                _currencyFormat.format(basePrice),
                               ),
-                              _buildPriceRow(
-                                lang.t('Structure & Fitting', 'स्ट्रक्चर और फिटिंग'),
-                                _currencyFormat.format(installCost),
-                              ),
-                              _buildPriceRow(
-                                lang.t('Inverter & Wiring', 'इन्वर्टर और वायरिंग'),
-                                _currencyFormat.format(otherCost),
-                              ),
+                              if (_isHybrid && bPrice > 0)
+                                _buildPriceRow(
+                                  '${lang.t("Hybrid Battery Bank", "हाइब्रिड बैटरी")} ($_batteryVoltage)',
+                                  _currencyFormat.format(bPrice),
+                                  isGreen: true,
+                                ),
+                              if (installCost > 0)
+                                _buildPriceRow(
+                                  lang.t('Extra Structure & Fitting', 'अतिरिक्त स्ट्रक्चर खर्च'),
+                                  _currencyFormat.format(installCost),
+                                ),
+                              if (otherCost > 0)
+                                _buildPriceRow(
+                                  lang.t('Extra Wiring Charges', 'अतिरिक्त वायरिंग खर्च'),
+                                  _currencyFormat.format(otherCost),
+                                ),
                               const Divider(height: 14, thickness: 1, color: AppColors.ink),
                               _buildPriceRow(
                                 lang.t('Total System Cost', 'कुल खर्च (Total Price)'),
@@ -1167,8 +1264,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Expanded(child: _buildSpecBox(lang.t('Daily Power', 'रोजाना बिजली'), '~$dailyUnits ${lang.t("Units", "यूनिट")}')),
-                                  Expanded(child: _buildSpecBox(lang.t('Plates', 'प्लेट्स'), '$pCount ${lang.t("Nos (540W)", "प्लेट्स")}')),
+                                  Expanded(child: _buildSpecBox(lang.t('Daily Power', 'रोजाना बिजली'), '~${dailyUnits.round()} ${lang.t("Units", "यूनिट")}')),
+                                  Expanded(child: _buildSpecBox(lang.t('Panels', 'पैनल संख्या'), '~$autoPlates ${lang.t("TopCon (540W)", "प्लेट्स")}')),
                                   Expanded(child: _buildSpecBox(lang.t('Roof Area', 'छत की जगह'), '~$roofAreaSqFt ${lang.t("sq.ft.", "वर्ग फुट")}')),
                                 ],
                               ),
@@ -1395,7 +1492,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    lang.t('3. BANK LOAN & EASY EMI (FINANCE)', '3. सोलर बैंक लोन व आसान किश्त (EMI)'),
+                    lang.t('2. BANK LOAN & EASY EMI (FINANCE)', '2. सोलर बैंक लोन व आसान किश्त (EMI)'),
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -1411,8 +1508,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             const SizedBox(height: 4),
             Text(
               lang.t(
-                'Calculate solar loan EMI and monthly savings (SBI/Govt loan ~7% to 8.5% p.a.):',
-                'सोलर बैंक लोन व मासिक किश्त का हिसाब निकालें (पीएम सूर्य घर लोन ~7% से 8.5%):',
+                'Calculate solar loan EMI and monthly savings (PM Surya Ghar Loan ~5.76% p.a.):',
+                'सोलर बैंक लोन व मासिक किश्त का हिसाब निकालें (पीएम सूर्य घर लोन ~5.76% सालाना):',
               ),
               style: const TextStyle(fontSize: 11, color: AppColors.muted),
             ),
@@ -1583,12 +1680,39 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             ),
             const SizedBox(height: 8),
 
-            // Quick Chips for Interest Rate & Tenure
+            // Quick Chips for Interest Rate Presets & Tenure
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(
                 children: [
+                  Text(
+                    '${lang.t("Rate", "दर")}: ',
+                    style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                  ),
+                  for (final r in [5.76, 7.0, 8.5]) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        label: Text('$r%'),
+                        labelStyle: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: (rate - r).abs() < 0.05 ? AppColors.ink : AppColors.muted,
+                        ),
+                        selected: (rate - r).abs() < 0.05,
+                        selectedColor: AppColors.sun,
+                        backgroundColor: AppColors.cream,
+                        showCheckmark: false,
+                        onSelected: (_) {
+                          setState(() {
+                            _interestRateController.text = r.toString();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 6),
                   Text(
                     '${lang.t("Tenure", "साल")}: ',
                     style: const TextStyle(fontSize: 11, color: AppColors.muted),
@@ -1638,87 +1762,55 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                lang.t('MONTHLY EMI (किश्त)', 'महीने की किश्त (EMI)'),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.8,
-                                  color: AppColors.muted,
-                                ),
+                                lang.t('Monthly Bank EMI', 'हर महीने की किश्त (EMI)'),
+                                style: const TextStyle(fontSize: 11, color: AppColors.muted),
                               ),
                               const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  '${_currencyFormat.format(emi)} / ${lang.t("mo", "महीना")}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.teal,
-                                  ),
-                                ),
+                              Text(
+                                '${_currencyFormat.format(emi)} / ${lang.t("mo", "महीना")}',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.teal),
                               ),
                             ],
                           ),
                         ),
-                        Container(width: 1, height: 36, color: AppColors.ink.withOpacity(0.15)),
-                        const SizedBox(width: 10),
+                        Container(width: 1, height: 36, color: AppColors.creamDark),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lang.t('TOTAL INTEREST', 'कुल ब्याज'),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.8,
-                                  color: AppColors.muted,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  lang.t('Total Bank Interest', 'कुल बैंक ब्याज'),
+                                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
+                                const SizedBox(height: 2),
+                                Text(
                                   _currencyFormat.format(totalInterest),
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.ink,
-                                  ),
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const Divider(height: 16),
-                    // Monthly cashflow comparison callout
+                    const Divider(height: 16, color: AppColors.creamDark),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          netMonthlyCashflow >= 0 ? Icons.check_circle_outline : Icons.info_outline,
-                          size: 16,
-                          color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.muted,
+                        Text(
+                          lang.t('Net Monthly Savings after EMI:', 'किश्त देने के बाद शुद्ध मासिक बचत:'),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ink),
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            netMonthlyCashflow >= 0
-                                ? lang.t(
-                                    'Free Solar! Bijli savings (₹${monthlySavings.round()}) cover EMI with +₹${netMonthlyCashflow.round()} extra cash in hand!',
-                                    'सोलर फ्री में! बिजली बचत (₹${monthlySavings.round()}) किश्त चुका देगी और महीने में +₹${netMonthlyCashflow.round()} बचेंगे!',
-                                  )
-                                : lang.t(
-                                    'Effective cost is only ₹${(-netMonthlyCashflow).round()}/mo (EMI ₹${emi.round()} - Saved ₹${monthlySavings.round()}) for $years yrs.',
-                                    'असल खर्च सिर्फ ₹${(-netMonthlyCashflow).round()}/माह (किश्त ₹${emi.round()} - बचत ₹${monthlySavings.round()}) $years साल तक।',
-                                  ),
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.ink,
-                            ),
+                        Text(
+                          netMonthlyCashflow >= 0
+                              ? '+${_currencyFormat.format(netMonthlyCashflow)}'
+                              : _currencyFormat.format(netMonthlyCashflow),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: netMonthlyCashflow >= 0 ? AppColors.teal : AppColors.coral,
                           ),
                         ),
                       ],

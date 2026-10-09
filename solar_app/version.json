@@ -1,8 +1,8 @@
 {
-  "version": "v0.0.8",
-  "versionCode": 8,
-  "notes": "Unblocked multi-tier update mirrors, socket-drained streaming downloader, external cache storage, and native Android FileProvider package installer.",
-  "apkUrl": "https://github.com/Suvesh108/solar/releases/download/v0.0.8/Sunward.apk",
+  "version": "v0.0.9",
+  "versionCode": 9,
+  "notes": "Unified Solar Setup & Pricing, turnkey ₹70k/kW pricing, On-Grid vs Hybrid battery integration with manual pricing, and 5.76% PM Surya Ghar loan rate.",
+  "apkUrl": "https://github.com/Suvesh108/solar/releases/download/v0.0.9/Sunward.apk",
   "fallbackApkUrl": "https://github.com/Suvesh108/solar/releases/latest/download/Sunward.apk",
-  "apkSize": 54606311
+  "apkSize": 54720999
 }

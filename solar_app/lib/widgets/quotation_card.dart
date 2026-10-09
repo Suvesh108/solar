@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../constants/solar_pricing_config.dart';
 import '../theme/app_theme.dart';
 
 class QuotationCard extends StatelessWidget {
@@ -8,9 +9,10 @@ class QuotationCard extends StatelessWidget {
   final String customerLocation;
   final String propertyType;
   final double kw;
-  final int plateCount;
-  final double platePrice;
-  final double totalPlatesCost;
+  final String installationType; // 'On-Grid' or 'Hybrid'
+  final String? batteryVoltage;   // '24V' or '48V'
+  final double batteryPrice;      // Manually entered, 0 for on-grid
+  final double baseSolarCost;     // kw * 70000
   final double installCost;
   final double inverterWiringCost;
   final double totalSystemCost;
@@ -34,9 +36,10 @@ class QuotationCard extends StatelessWidget {
     required this.customerLocation,
     required this.propertyType,
     required this.kw,
-    required this.plateCount,
-    required this.platePrice,
-    required this.totalPlatesCost,
+    this.installationType = 'On-Grid',
+    this.batteryVoltage,
+    this.batteryPrice = 0.0,
+    required this.baseSolarCost,
     required this.installCost,
     required this.inverterWiringCost,
     required this.totalSystemCost,
@@ -59,6 +62,8 @@ class QuotationCard extends StatelessWidget {
     final currency = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
     final numFormat = NumberFormat('#,##,###', 'en_IN');
     final hasLoan = (loanAmount != null && loanAmount! > 0 && emiAmount != null && emiAmount! > 0);
+    final isHybrid = installationType == 'Hybrid';
+    final autoPlates = SolarPricingConfig.calculatePlateCount(kw);
 
     return Container(
       width: 440,
@@ -120,17 +125,19 @@ class QuotationCard extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: AppColors.ink,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${kw.toStringAsFixed(1)} kW ON-GRID',
+                  isHybrid
+                      ? '${kw.toStringAsFixed(1)} kW HYBRID (${batteryVoltage ?? "24V"})'
+                      : '${kw.toStringAsFixed(1)} kW ON-GRID',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 11,
+                    fontSize: 10.5,
                   ),
                 ),
               ),
@@ -265,24 +272,27 @@ class QuotationCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSpecTile('Solar Plant Size', '${kw.toStringAsFixed(1)} kW On-Grid'),
-                    _buildSpecTile('Solar Plates', '$plateCount Plates (540W Mono PERC)'),
+                    _buildSpecTile('Solar Plant Size', '${kw.toStringAsFixed(1)} kW $installationType'),
+                    _buildSpecTile('Solar Panels', '$autoPlates Panels (540W TopCon)'),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSpecTile('Daily Generation', '~${(kw * 4).round()} Units / Day'),
-                    _buildSpecTile('Monthly Generation', '~${(kw * 120).round()} Units / Month'),
+                    _buildSpecTile('Daily Generation', '~${(kw * SolarPricingConfig.dailyUnitsPerKw).round()} Units / Day'),
+                    _buildSpecTile('Monthly Generation', '~${(kw * SolarPricingConfig.unitsPerKwMonth).round()} Units / Month'),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildSpecTile('Required Roof Area', '~${(kw * 100).round()} Sq. Ft.'),
-                    _buildSpecTile('Inverter Tech', 'Grid-Tie High-Efficiency'),
+                    _buildSpecTile('Roof Area Needed', '~${(kw * SolarPricingConfig.sqFtPerKw).round()} Sq. Ft.'),
+                    _buildSpecTile(
+                      isHybrid ? 'Battery Bank' : 'Inverter Tech',
+                      isHybrid ? '${batteryVoltage ?? "24V"} Solar Battery' : 'Grid-Tie High-Efficiency',
+                    ),
                   ],
                 ),
               ],
@@ -305,9 +315,20 @@ class QuotationCard extends StatelessWidget {
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.ink, letterSpacing: 0.5),
                 ),
                 const SizedBox(height: 8),
-                _buildPriceRow('Solar Plates ($plateCount × ₹${platePrice.round()})', currency.format(totalPlatesCost)),
-                _buildPriceRow('Mounting Structure & Civil Fitting', currency.format(installCost)),
-                _buildPriceRow('Inverter, AC/DC Wiring & Protection', currency.format(inverterWiringCost)),
+                _buildPriceRow(
+                  'Turnkey Solar Package (${kw.toStringAsFixed(1)} kW @ ₹70,000/kW)',
+                  currency.format(baseSolarCost),
+                ),
+                if (isHybrid && batteryPrice > 0)
+                  _buildPriceRow(
+                    'Hybrid Battery Bank (${batteryVoltage ?? "24V"})',
+                    currency.format(batteryPrice),
+                    isGreen: true,
+                  ),
+                if (installCost > 0)
+                  _buildPriceRow('Additional Structure / Civil Fitting', currency.format(installCost)),
+                if (inverterWiringCost > 0)
+                  _buildPriceRow('Additional Wiring & Balance of Plant', currency.format(inverterWiringCost)),
                 const Divider(height: 12, thickness: 1, color: AppColors.ink),
                 _buildPriceRow('Total System Cost', currency.format(totalSystemCost), isBold: true),
                 _buildPriceRow(
@@ -359,7 +380,7 @@ class QuotationCard extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        '$loanYears Yrs @ ${interestRate?.toStringAsFixed(1) ?? "8.5"}%',
+                        '$loanYears Yrs @ ${interestRate?.toStringAsFixed(2) ?? "5.76"}%',
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.teal),
                       ),
                     ],
@@ -393,7 +414,7 @@ class QuotationCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildTrustPill('25-Yr Panel Warranty'),
-              _buildTrustPill('5-Yr Inverter Guarantee'),
+              _buildTrustPill('5-Yr System Guarantee'),
               _buildTrustPill('MNRE Approved'),
             ],
           ),
@@ -455,9 +476,8 @@ class QuotationCard extends StatelessWidget {
         Text(
           subtitle,
           style: TextStyle(
-            fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: isHighlight ? AppColors.teal : AppColors.ink.withOpacity(0.75),
+            fontSize: 8.5,
+            color: AppColors.ink.withOpacity(0.65),
           ),
         ),
       ],
@@ -470,11 +490,11 @@ class QuotationCard extends StatelessWidget {
       children: [
         Text(
           label,
-          style: TextStyle(fontSize: 9, color: AppColors.ink.withOpacity(0.65), fontWeight: FontWeight.w600),
+          style: TextStyle(fontSize: 8.5, color: AppColors.ink.withOpacity(0.65)),
         ),
         Text(
           value,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.ink),
+          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.ink),
         ),
       ],
     );
@@ -486,20 +506,24 @@ class QuotationCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: isBold ? FontWeight.w900 : FontWeight.w600,
-              color: isGreen ? const Color(0xFF0F5132) : AppColors.ink,
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+                color: isGreen ? AppColors.teal : AppColors.ink,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
           Text(
             value,
             style: TextStyle(
               fontSize: 10.5,
-              fontWeight: isBold || isGreen ? FontWeight.w900 : FontWeight.w600,
-              color: isGreen ? const Color(0xFF0F5132) : AppColors.ink,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+              color: isGreen ? AppColors.teal : AppColors.ink,
             ),
           ),
         ],
@@ -509,14 +533,21 @@ class QuotationCard extends StatelessWidget {
 
   Widget _buildTrustPill(String title) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.5),
+        color: Colors.black.withOpacity(0.08),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        '✓ $title',
-        style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.bold, color: AppColors.ink),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, size: 11, color: AppColors.ink),
+          const SizedBox(width: 4),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.ink),
+          ),
+        ],
       ),
     );
   }

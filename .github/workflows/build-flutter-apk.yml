@@ -81,7 +81,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v0.0.8"
+          TAG_NAME="v0.0.9"
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK1="Sunward-${TAG_NAME}.apk"
           OUT_APK2="Sunward.apk"
@@ -92,5 +92,5 @@ jobs:
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
             gh release upload "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --clobber
           else
-            gh release create "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME: Unblocked multi-tier update mirrors, socket-drained streaming downloader, external cache storage, and native Android FileProvider package installer."
+            gh release create "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME: Unified Solar Setup & Pricing, turnkey ₹70k/kW pricing, On-Grid vs Hybrid battery integration with manual pricing, and 5.76% PM Surya Ghar loan rate."
           fi

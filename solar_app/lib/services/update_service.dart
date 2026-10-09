@@ -46,8 +46,8 @@ class UpdateCheckResult {
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.8';
-  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/download/v0.0.8/Sunward.apk';
+  static const String currentVersion = 'v0.0.9';
+  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/download/v0.0.9/Sunward.apk';
 
   // Multi-tier endpoints verified to be accessible without ISP blocking or rate limiting
   static List<String> get versionEndpoints {

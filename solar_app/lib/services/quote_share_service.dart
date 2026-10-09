@@ -15,9 +15,10 @@ class QuoteShareService {
     required String location,
     required String propertyType,
     required double kw,
-    required int plateCount,
-    required double platePrice,
-    required double totalPlatesCost,
+    String installationType = 'On-Grid',
+    String? batteryVoltage,
+    double batteryPrice = 0.0,
+    required double baseSolarCost,
     required double installCost,
     required double inverterWiringCost,
     required double totalSystemCost,
@@ -30,17 +31,32 @@ class QuoteShareService {
     double? loanAmount,
     double? emiAmount,
     int? loanYears,
+    double? interestRate,
   }) {
     final hasLoan = (loanAmount != null && loanAmount > 0 && emiAmount != null && emiAmount > 0);
+    final isHybrid = installationType == 'Hybrid';
+    final autoPlates = ((kw * 1000) / 540).ceil();
 
     final loanSection = hasLoan
         ? '''
 🏦 *BANK LOAN & EASY EMI (किश्त हिसाब):*
-• Sanctioned Loan: ₹${loanAmount.round()} ($loanYears Yrs)
+• Sanctioned Loan: ₹${loanAmount.round()} ($loanYears Yrs @ ${interestRate?.toStringAsFixed(2) ?? "5.76"}%)
 • Monthly EMI (किश्त): ₹${emiAmount.round()} / month
 • Monthly Savings: ₹${monthlySavings.round()} / month
 ${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net EMI difference: ₹${(emiAmount - monthlySavings).round()} / mo'}
 '''
+        : '';
+
+    final batteryLine = (isHybrid && batteryPrice > 0)
+        ? '• Hybrid Battery Bank (${batteryVoltage ?? "24V"}): ₹${batteryPrice.round()}\n'
+        : '';
+
+    final extraFittingLine = installCost > 0
+        ? '• Extra Structure & Fitting: ₹${installCost.round()}\n'
+        : '';
+
+    final extraWiringLine = inverterWiringCost > 0
+        ? '• Extra Wiring & Protection: ₹${inverterWiringCost.round()}\n'
         : '';
 
     return '''
@@ -50,19 +66,18 @@ ${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net 
 📞 *Contact:* $phone
 📍 *Location:* $location
 🏠 *Property:* $propertyType
+⚙️ *System Type:* $installationType Solar System
 
 ⚡ *SYSTEM SPECIFICATIONS:*
 • Solar Capacity: ${kw.toStringAsFixed(1)} kW System
-• Solar Plates: $plateCount Plates (540W Mono PERC)
+• Solar Panels: ~$autoPlates Panels (540W TopCon)
 • Daily Generation: ~${(kw * 4).round()} Units / day
 • Monthly Generation: ~${(kw * 120).round()} Units / month
 • Rooftop Area: ~${(kw * 100).round()} sq. ft.
-
+${isHybrid ? '• Battery Setup: ${batteryVoltage ?? "24V"} Solar Battery Bank\n' : ''}
 💰 *COST BREAKDOWN (HISAAB):*
-• Solar Plates Cost ($plateCount × ₹${platePrice.round()}): ₹${totalPlatesCost.round()}
-• Fitting & Structure: ₹${installCost.round()}
-• Inverter & Wiring: ₹${inverterWiringCost.round()}
-─────────────────────────
+• Turnkey Solar Package (${kw.toStringAsFixed(1)} kW): ₹${baseSolarCost.round()}
+$batteryLine$extraFittingLine$extraWiringLine─────────────────────────
 • *Total System Cost:* ₹${totalSystemCost.round()}
 • *Govt Subsidy Discount:* -₹${subsidy.round()}
 ★ *FINAL AMOUNT TO PAY:* ₹${netPayable.round()}
