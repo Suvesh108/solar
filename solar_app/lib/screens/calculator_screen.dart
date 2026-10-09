@@ -33,6 +33,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   final _interestRateController = TextEditingController(text: '8.5'); // 8.5% p.a.
   final _loanTenureController = TextEditingController(text: '5');      // 5 years
 
+  // Auto-zero focus nodes (clears '0' on click, restores '0' when left empty)
+  final _billFocus = FocusNode();
+  final _kwFocus = FocusNode();
+  final _plateCountFocus = FocusNode();
+  final _plateCostFocus = FocusNode();
+  final _tariffFocus = FocusNode();
+  final _installRateFocus = FocusNode();
+  final _extraCostFocus = FocusNode();
+  final _subsidyFocus = FocusNode();
+  final _loanAmountFocus = FocusNode();
+  final _interestRateFocus = FocusNode();
+  final _loanTenureFocus = FocusNode();
+
   String _propertyType = 'Residential';
   final GlobalKey _quotationBoundaryKey = GlobalKey();
 
@@ -46,6 +59,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
   void initState() {
     super.initState();
     _recalculateSubsidy(0.0, _propertyType);
+
+    _setupAutoZero(_billController, _billFocus, () => setState(() {}));
+    _setupAutoZero(_kwController, _kwFocus, () {
+      _recalculateSubsidy(_kw, _propertyType);
+      setState(() {});
+    });
+    _setupAutoZero(_plateCountController, _plateCountFocus, () => setState(() {}));
+    _setupAutoZero(_plateCostController, _plateCostFocus, () => setState(() {}));
+    _setupAutoZero(_tariffController, _tariffFocus, () => setState(() {}));
+    _setupAutoZero(_installRateController, _installRateFocus, () => setState(() {}));
+    _setupAutoZero(_extraCostController, _extraCostFocus, () => setState(() {}));
+    _setupAutoZero(_subsidyController, _subsidyFocus, () => setState(() {}));
+    _setupAutoZero(_loanAmountController, _loanAmountFocus, () => setState(() {}));
+    _setupAutoZero(_interestRateController, _interestRateFocus, () => setState(() {}));
+    _setupAutoZero(_loanTenureController, _loanTenureFocus, () => setState(() {}));
+  }
+
+  void _setupAutoZero(
+    TextEditingController controller,
+    FocusNode focusNode,
+    VoidCallback onEmptyRestore,
+  ) {
+    focusNode.addListener(() {
+      if (focusNode.hasFocus) {
+        if (controller.text.trim() == '0' || controller.text.trim() == '0.0') {
+          controller.clear();
+        }
+      } else {
+        if (controller.text.trim().isEmpty) {
+          controller.text = '0';
+          onEmptyRestore();
+        }
+      }
+    });
   }
 
   @override
@@ -61,6 +108,19 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
     _loanAmountController.dispose();
     _interestRateController.dispose();
     _loanTenureController.dispose();
+
+    _billFocus.dispose();
+    _kwFocus.dispose();
+    _plateCountFocus.dispose();
+    _plateCostFocus.dispose();
+    _tariffFocus.dispose();
+    _installRateFocus.dispose();
+    _extraCostFocus.dispose();
+    _subsidyFocus.dispose();
+    _loanAmountFocus.dispose();
+    _interestRateFocus.dispose();
+    _loanTenureFocus.dispose();
+
     super.dispose();
   }
 
@@ -609,6 +669,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   const SizedBox(height: 6),
                                   TextField(
                                     controller: _billController,
+                                    focusNode: _billFocus,
+                                    onTap: () {
+                                      if (_billController.text.trim() == '0') _billController.clear();
+                                    },
                                     keyboardType: TextInputType.number,
                                     onChanged: _onBillChanged,
                                     decoration: const InputDecoration(
@@ -633,6 +697,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                                   const SizedBox(height: 6),
                                   TextField(
                                     controller: _kwController,
+                                    focusNode: _kwFocus,
+                                    onTap: () {
+                                      if (_kwController.text.trim() == '0' || _kwController.text.trim() == '0.0') _kwController.clear();
+                                    },
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                     onChanged: _onKwChanged,
                                     decoration: const InputDecoration(
@@ -730,6 +798,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             Expanded(
                               child: TextField(
                                 controller: _plateCountController,
+                                focusNode: _plateCountFocus,
+                                onTap: () {
+                                  if (_plateCountController.text.trim() == '0') _plateCountController.clear();
+                                },
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: lang.t('No. of Solar Plates', 'सोलर प्लेट्स संख्या'),
@@ -742,6 +814,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             Expanded(
                               child: TextField(
                                 controller: _plateCostController,
+                                focusNode: _plateCostFocus,
+                                onTap: () {
+                                  if (_plateCostController.text.trim() == '0') _plateCostController.clear();
+                                },
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: lang.t('Price / Plate (₹)', '1 प्लेट की कीमत (₹)'),
@@ -760,6 +836,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             Expanded(
                               child: TextField(
                                 controller: _tariffController,
+                                focusNode: _tariffFocus,
+                                onTap: () {
+                                  if (_tariffController.text.trim() == '0' || _tariffController.text.trim() == '0.0') _tariffController.clear();
+                                },
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 decoration: InputDecoration(
                                   labelText: lang.t('Bijli Rate (₹/unit)', 'बिजली रेट (₹/यूनिट)'),
@@ -772,6 +852,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                             Expanded(
                               child: TextField(
                                 controller: _installRateController,
+                                focusNode: _installRateFocus,
+                                onTap: () {
+                                  if (_installRateController.text.trim() == '0') _installRateController.clear();
+                                },
                                 keyboardType: TextInputType.number,
                                 decoration: InputDecoration(
                                   labelText: lang.t('Fitting / Labour (₹/kW)', 'फिटिंग व स्ट्रक्चर (₹/kW)'),
@@ -787,6 +871,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         // Inverter & Wiring Extra Charges
                         TextField(
                           controller: _extraCostController,
+                          focusNode: _extraCostFocus,
+                          onTap: () {
+                            if (_extraCostController.text.trim() == '0') _extraCostController.clear();
+                          },
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: lang.t('Inverter & Wiring Charges (₹)', 'इन्वर्टर और वायरिंग खर्च (₹)'),
@@ -799,6 +887,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                         // Government Subsidy (Auto computed by residential rule)
                         TextField(
                           controller: _subsidyController,
+                          focusNode: _subsidyFocus,
+                          onTap: () {
+                            if (_subsidyController.text.trim() == '0') _subsidyController.clear();
+                          },
                           keyboardType: TextInputType.number,
                           decoration: InputDecoration(
                             labelText: lang.t('Govt Subsidy Discount (₹)', 'सरकारी सब्सिडी छूट (₹)'),
@@ -1334,7 +1426,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
             const SizedBox(height: 6),
             TextField(
               controller: _loanAmountController,
+              focusNode: _loanAmountFocus,
               keyboardType: TextInputType.number,
+              onTap: () {
+                if (_loanAmountController.text.trim() == '0') {
+                  _loanAmountController.clear();
+                }
+              },
               decoration: InputDecoration(
                 prefixText: '₹ ',
                 prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
@@ -1435,7 +1533,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       const SizedBox(height: 6),
                       TextField(
                         controller: _interestRateController,
+                        focusNode: _interestRateFocus,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        onTap: () {
+                          if (_interestRateController.text.trim() == '0') {
+                            _interestRateController.clear();
+                          }
+                        },
                         decoration: const InputDecoration(
                           suffixText: '%',
                           suffixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
@@ -1459,7 +1563,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> with SingleTickerPr
                       const SizedBox(height: 6),
                       TextField(
                         controller: _loanTenureController,
+                        focusNode: _loanTenureFocus,
                         keyboardType: TextInputType.number,
+                        onTap: () {
+                          if (_loanTenureController.text.trim() == '0') {
+                            _loanTenureController.clear();
+                          }
+                        },
                         decoration: InputDecoration(
                           suffixText: lang.t('Yrs', 'साल'),
                           suffixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),

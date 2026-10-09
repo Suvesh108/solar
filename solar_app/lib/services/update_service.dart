@@ -45,23 +45,30 @@ class UpdateCheckResult {
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.6';
-  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/latest/download/Sunward.apk';
+  static const String currentVersion = 'v0.0.7';
+  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/download/v0.0.7/Sunward.apk';
 
-  // Multi-tier endpoints to guarantee connectivity even on networks with DNS blocks on api.github.com
-  static const List<String> _versionEndpoints = [
-    // Tier 1: Fast CDN with Indian edge servers (Mumbai, Delhi) - never blocked on Jio/Airtel
-    'https://cdn.jsdelivr.net/gh/Suvesh108/solar@main/version.json',
-    // Tier 2: GitHub Raw JSON
-    'https://raw.githubusercontent.com/Suvesh108/solar/main/version.json',
-    // Tier 3: Official GitHub Releases API
-    'https://api.github.com/repos/Suvesh108/solar/releases',
-  ];
+  // Multi-tier endpoints with cache busters to guarantee live connectivity on all networks
+  static List<String> get versionEndpoints {
+    final t = DateTime.now().millisecondsSinceEpoch;
+    return [
+      // Tier 1: Fast CDN with Indian edge servers (Mumbai, Delhi) with cache-buster
+      'https://cdn.jsdelivr.net/gh/Suvesh108/solar@main/version.json?t=$t',
+      // Tier 2: GitHub Raw JSON with cache-buster
+      'https://raw.githubusercontent.com/Suvesh108/solar/main/version.json?t=$t',
+      // Tier 3: Fastly JSDelivr mirror
+      'https://fastly.jsdelivr.net/gh/Suvesh108/solar@main/version.json?t=$t',
+      // Tier 4: Official GitHub Releases API (latest)
+      'https://api.github.com/repos/Suvesh108/solar/releases/latest',
+      // Tier 5: Official GitHub Releases API list
+      'https://api.github.com/repos/Suvesh108/solar/releases',
+    ];
+  }
 
   static Future<UpdateCheckResult> checkForUpdate() async {
     String lastError = '';
 
-    for (final endpoint in _versionEndpoints) {
+    for (final endpoint in versionEndpoints) {
       try {
         final response = await http.get(
           Uri.parse(endpoint),
@@ -195,13 +202,29 @@ class UpdateService {
   }) async {
     try {
       final client = http.Client();
-      final request = http.Request('GET', Uri.parse(apkUrl));
-      request.headers['User-Agent'] = 'SunwardSolarApp/$currentVersion';
-      request.followRedirects = true;
+      var currentUrl = apkUrl;
+      http.StreamedResponse? response;
 
-      final response = await client.send(request);
+      // Handle up to 8 HTTP redirects across domains (e.g. GitHub Releases -> Azure/AWS blob CDN)
+      for (int i = 0; i < 8; i++) {
+        final request = http.Request('GET', Uri.parse(currentUrl));
+        request.headers['User-Agent'] = 'SunwardSolarApp/$currentVersion';
+        request.headers['Accept'] = '*/*';
+        request.followRedirects = false;
 
-      if (response.statusCode != 200) return null;
+        final resp = await client.send(request);
+        if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.containsKey('location')) {
+          currentUrl = resp.headers['location']!;
+          continue;
+        }
+        response = resp;
+        break;
+      }
+
+      if (response == null || response.statusCode != 200) {
+        debugPrint('Download failed with HTTP ${response?.statusCode} at $currentUrl');
+        return null;
+      }
 
       final totalBytes = response.contentLength ?? 0;
       final tempDir = await getTemporaryDirectory();
@@ -218,7 +241,7 @@ class UpdateService {
         sink.add(chunk);
         receivedBytes += chunk.length;
         if (totalBytes > 0) {
-          onProgress(receivedBytes / totalBytes);
+          onProgress((receivedBytes / totalBytes).clamp(0.0, 1.0));
         }
       }
 

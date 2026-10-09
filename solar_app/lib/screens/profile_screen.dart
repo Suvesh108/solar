@@ -375,13 +375,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 8),
                           SizedBox(
                             width: double.infinity,
-                            height: 38,
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(foregroundColor: AppColors.teal),
-                              icon: const Icon(Icons.open_in_browser, size: 18),
+                            height: 42,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.teal,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(Icons.download_for_offline, size: 18),
                               label: Text(
-                                lang.t('Download Latest APK Directly (Browser)', 'नया APK ब्राउज़र से सीधे डाउनलोड करें'),
+                                lang.t('Download & Install Internally (In-App)', 'ऐप के अंदर सीधे डाउनलोड व इंस्टॉल करें'),
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () => _startInAppDownload(
+                                UpdateInfo(
+                                  version: 'Latest',
+                                  notes: 'Direct internal update without browser',
+                                  apkUrl: UpdateService.latestDirectApkUrl,
+                                  apkSize: 0,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Center(
+                            child: TextButton(
+                              style: TextButton.styleFrom(foregroundColor: AppColors.muted),
+                              child: Text(
+                                lang.t('Open Browser Download (Fallback)', 'ब्राउज़र से डाउनलोड (वैकल्पिक)'),
+                                style: const TextStyle(fontSize: 11),
                               ),
                               onPressed: () => UpdateService.openManualDownloadUrl(UpdateService.latestDirectApkUrl),
                             ),

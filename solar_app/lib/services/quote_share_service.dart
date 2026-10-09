@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:share_plus/share_plus.dart';
@@ -128,13 +129,32 @@ $loanSection
     return false;
   }
 
-  /// Sends the full quotation card image to WhatsApp with ZERO text caption
-  /// (100% detail in the image card).
+  static const MethodChannel _nativeChannel = MethodChannel('com.sunward.solar/whatsapp');
+
+  /// Sends the full quotation card image directly to WhatsApp chat for the customer number
+  /// with ZERO text caption and NO system share sheet picker.
   static Future<bool> sendQuotationCardToWhatsApp({
     required File imageFile,
     required String phone,
     required String customerName,
   }) async {
+    // 1. Primary: Direct native WhatsApp Intent with recipient JID (No system chooser)
+    try {
+      final bool? nativeSuccess = await _nativeChannel.invokeMethod<bool>(
+        'sendWhatsAppImage',
+        {
+          'filePath': imageFile.path,
+          'phone': phone,
+        },
+      );
+      if (nativeSuccess == true) {
+        return true;
+      }
+    } catch (e) {
+      debugPrint('Native direct WhatsApp dispatch error: $e');
+    }
+
+    // 2. Fallback: Share.shareXFiles
     try {
       await Share.shareXFiles(
         [XFile(imageFile.path)],
@@ -143,7 +163,7 @@ $loanSection
       );
       return true;
     } catch (e) {
-      debugPrint('Share error: $e');
+      debugPrint('Fallback Share error: $e');
       return false;
     }
   }
