@@ -51,7 +51,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v0.0.5"
+          TAG_NAME="v0.0.6"
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK1="Sunward-${TAG_NAME}.apk"
           OUT_APK2="Sunward.apk"
@@ -62,5 +62,5 @@ jobs:
           if gh release view "$TAG_NAME" > /dev/null 2>&1; then
             gh release upload "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --clobber
           else
-            gh release create "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --title "$TAG_NAME - Sunward App Update" --notes "Release $TAG_NAME with Golden WhatsApp Quotation Card, Save & Send CTA, Independent Manual Inputs, Sunward App Branding, and Calculator 0-Reset."
+            gh release create "$TAG_NAME" "$OUT_APK1" "$OUT_APK2" "$OUT_APK3" --title "$TAG_NAME - Sunward Solar App Update" --notes "Release $TAG_NAME: Full self-contained quotation card image (100% details, zero text), direct WhatsApp chatbox dispatch with card attachment, multi-tier update check with fallback, REQUEST_INSTALL_PACKAGES permission, and clean lead management."
           fi

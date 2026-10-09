@@ -5,6 +5,15 @@ plugins {
 }
 
 android {
+    signingConfigs {
+        create("release") {
+            keyAlias = "sunward_key"
+            keyPassword = "sunward123456"
+            storeFile = file("sunward-release.jks")
+            storePassword = "sunward123456"
+        }
+    }
+
     namespace = "com.sunward.solar"
     compileSdk = 34
     ndkVersion = flutter.ndkVersion
@@ -28,7 +37,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

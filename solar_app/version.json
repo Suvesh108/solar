@@ -1,0 +1,8 @@
+{
+  "version": "v0.0.6",
+  "versionCode": 6,
+  "notes": "Full quotation card in WhatsApp (100% details in card, 0 text), direct WhatsApp chat dispatch to customer number, and resilient in-app update engine.",
+  "apkUrl": "https://github.com/Suvesh108/solar/releases/download/v0.0.6/Sunward.apk",
+  "fallbackApkUrl": "https://github.com/Suvesh108/solar/releases/latest/download/Sunward.apk",
+  "apkSize": 26000000
+}

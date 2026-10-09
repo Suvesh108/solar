@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class UpdateInfo {
   final String version;
@@ -31,6 +32,7 @@ class UpdateCheckResult {
   final String currentVersion;
   final String? latestVersion;
   final String? errorMessage;
+  final String? manualDownloadUrl;
 
   UpdateCheckResult({
     required this.status,
@@ -38,62 +40,61 @@ class UpdateCheckResult {
     required this.currentVersion,
     this.latestVersion,
     this.errorMessage,
+    this.manualDownloadUrl,
   });
 }
 
 class UpdateService {
-  static const String currentVersion = 'v0.0.5';
-  static const String _releasesListUrl = 'https://api.github.com/repos/Suvesh108/solar/releases';
+  static const String currentVersion = 'v0.0.6';
+  static const String latestDirectApkUrl = 'https://github.com/Suvesh108/solar/releases/latest/download/Sunward.apk';
+
+  // Multi-tier endpoints to guarantee connectivity even on networks with DNS blocks on api.github.com
+  static const List<String> _versionEndpoints = [
+    // Tier 1: Fast CDN with Indian edge servers (Mumbai, Delhi) - never blocked on Jio/Airtel
+    'https://cdn.jsdelivr.net/gh/Suvesh108/solar@main/version.json',
+    // Tier 2: GitHub Raw JSON
+    'https://raw.githubusercontent.com/Suvesh108/solar/main/version.json',
+    // Tier 3: Official GitHub Releases API
+    'https://api.github.com/repos/Suvesh108/solar/releases',
+  ];
 
   static Future<UpdateCheckResult> checkForUpdate() async {
-    try {
-      final response = await http.get(
-        Uri.parse(_releasesListUrl),
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'SunwardSolarApp/$currentVersion',
-        },
-      ).timeout(const Duration(seconds: 12));
+    String lastError = '';
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is List && data.isNotEmpty) {
-          // GitHub returns releases array ordered descending by date; data[0] is latest
-          for (final item in data) {
-            final release = item as Map<String, dynamic>;
-            final isDraft = release['draft'] as bool? ?? false;
-            final isPrerelease = release['prerelease'] as bool? ?? false;
-            if (isDraft || isPrerelease) continue;
+    for (final endpoint in _versionEndpoints) {
+      try {
+        final response = await http.get(
+          Uri.parse(endpoint),
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'SunwardSolarApp/$currentVersion',
+          },
+        ).timeout(const Duration(seconds: 8));
 
-            final latestTag = (release['tag_name'] as String? ?? '').trim();
-            final body = release['body'] as String? ?? 'New version available with improvements.';
-            final assets = release['assets'] as List<dynamic>? ?? [];
+        if (response.statusCode == 200) {
+          final dynamic data = jsonDecode(response.body);
 
-            String apkUrl = '';
-            int apkSize = 0;
-
-            for (final asset in assets) {
-              final name = (asset['name'] as String? ?? '').toLowerCase();
-              if (name.endsWith('.apk')) {
-                apkUrl = asset['browser_download_url'] as String? ?? '';
-                apkSize = asset['size'] as int? ?? 0;
-                break;
-              }
-            }
+          // Handle version.json schema
+          if (data is Map<String, dynamic> && data.containsKey('version')) {
+            final latestTag = (data['version'] as String? ?? '').trim();
+            final notes = data['notes'] as String? ?? 'New version available with improvements.';
+            final apkUrl = data['apkUrl'] as String? ?? latestDirectApkUrl;
+            final apkSize = data['apkSize'] as int? ?? 0;
 
             if (latestTag.isNotEmpty) {
               final isNewer = _isNewerVersion(latestTag, currentVersion);
-              if (isNewer && apkUrl.isNotEmpty) {
+              if (isNewer) {
                 return UpdateCheckResult(
                   status: UpdateCheckStatus.updateAvailable,
                   update: UpdateInfo(
                     version: latestTag,
-                    notes: body,
+                    notes: notes,
                     apkUrl: apkUrl,
                     apkSize: apkSize,
                   ),
                   currentVersion: currentVersion,
                   latestVersion: latestTag,
+                  manualDownloadUrl: apkUrl,
                 );
               } else {
                 return UpdateCheckResult(
@@ -104,27 +105,70 @@ class UpdateService {
               }
             }
           }
-        }
 
-        return UpdateCheckResult(
-          status: UpdateCheckStatus.upToDate,
-          currentVersion: currentVersion,
-        );
-      } else {
-        return UpdateCheckResult(
-          status: UpdateCheckStatus.error,
-          currentVersion: currentVersion,
-          errorMessage: 'Server returned HTTP ${response.statusCode}',
-        );
+          // Handle GitHub Releases list schema
+          if (data is List && data.isNotEmpty) {
+            for (final item in data) {
+              final release = item as Map<String, dynamic>;
+              final isDraft = release['draft'] as bool? ?? false;
+              final isPrerelease = release['prerelease'] as bool? ?? false;
+              if (isDraft || isPrerelease) continue;
+
+              final latestTag = (release['tag_name'] as String? ?? '').trim();
+              final body = release['body'] as String? ?? 'New version available with improvements.';
+              final assets = release['assets'] as List<dynamic>? ?? [];
+
+              String apkUrl = latestDirectApkUrl;
+              int apkSize = 0;
+
+              for (final asset in assets) {
+                final name = (asset['name'] as String? ?? '').toLowerCase();
+                if (name.endsWith('.apk')) {
+                  apkUrl = asset['browser_download_url'] as String? ?? latestDirectApkUrl;
+                  apkSize = asset['size'] as int? ?? 0;
+                  break;
+                }
+              }
+
+              if (latestTag.isNotEmpty) {
+                final isNewer = _isNewerVersion(latestTag, currentVersion);
+                if (isNewer) {
+                  return UpdateCheckResult(
+                    status: UpdateCheckStatus.updateAvailable,
+                    update: UpdateInfo(
+                      version: latestTag,
+                      notes: body,
+                      apkUrl: apkUrl,
+                      apkSize: apkSize,
+                    ),
+                    currentVersion: currentVersion,
+                    latestVersion: latestTag,
+                    manualDownloadUrl: apkUrl,
+                  );
+                } else {
+                  return UpdateCheckResult(
+                    status: UpdateCheckStatus.upToDate,
+                    currentVersion: currentVersion,
+                    latestVersion: latestTag,
+                  );
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Endpoint $endpoint failed: $e');
+        lastError = e.toString();
+        // Continue loop to try next fallback endpoint
       }
-    } catch (e) {
-      debugPrint('Error checking for update: $e');
-      return UpdateCheckResult(
-        status: UpdateCheckStatus.error,
-        currentVersion: currentVersion,
-        errorMessage: e.toString(),
-      );
     }
+
+    return UpdateCheckResult(
+      status: UpdateCheckStatus.error,
+      currentVersion: currentVersion,
+      errorMessage: lastError.isNotEmpty ? lastError : 'Could not reach update servers.',
+      manualDownloadUrl: latestDirectApkUrl,
+    );
   }
 
   static bool _isNewerVersion(String latest, String current) {
@@ -191,6 +235,13 @@ class UpdateService {
     } catch (e) {
       debugPrint('Error downloading update: $e');
       return null;
+    }
+  }
+
+  static Future<void> openManualDownloadUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 }

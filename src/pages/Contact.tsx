@@ -9,8 +9,18 @@ export default function Contact() {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const fields = event.currentTarget.querySelectorAll("input");
-    saveLead({ name: fields[0].value, phone: fields[1].value, location: fields[2].value, monthlyBill: fields[3].value, propertyType: "House" });
+    const name = fields[0]?.value || "";
+    const phone = fields[1]?.value || "";
+    const location = fields[2]?.value || "";
+    const bill = fields[3]?.value || "";
+    saveLead({ name, phone, location, monthlyBill: bill, propertyType: "House" });
     setSent(true);
+
+    // Also trigger instant WhatsApp notification to father's phone so the lead is never lost
+    const text = encodeURIComponent(
+      `*New Solar Website Lead!*\n👤 Name: ${name}\n📞 Phone: ${phone}\n📍 Location: ${location}\n⚡ Monthly Bill: ₹${bill}\n\nClient has requested a free rooftop solar site assessment.`
+    );
+    window.open(`https://wa.me/919731001477?text=${text}`, "_blank");
   }
 
   return (
@@ -33,7 +43,7 @@ export default function Contact() {
               Apni details share karein. Hamara solar consultant aapko call karke next steps simple way mein samjhayega.
             </p>
             <div className="mt-6 flex flex-wrap gap-4 text-sm font-bold">
-              <a href="tel:+919999999999" className="hover:opacity-90 transition">Keypad phone? Call karein ☎</a>
+              <a href="tel:+919731001477" className="hover:opacity-90 transition">Keypad phone? Call karein ☎</a>
               <a href={whatsappUrl()} target="_blank" rel="noreferrer" className="hover:opacity-90 transition">
                 WhatsApp ↗
               </a>
@@ -64,7 +74,7 @@ export default function Contact() {
                   <motion.a
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    href="tel:+919999999999"
+                    href="tel:+919731001477"
                     className="mt-5 inline-block bg-[var(--ink)] px-5 py-3 text-sm font-bold text-white text-center"
                   >
                     Call us directly ☎
@@ -105,7 +115,7 @@ export default function Contact() {
                   >
                     Free assessment request karein <span className="float-right">↗</span>
                   </motion.button>
-                  <p className="text-xs text-[var(--muted)]">Smartphone nahi hai? Direct call karein: +91 99999 99999</p>
+                  <p className="text-xs text-[var(--muted)]">Smartphone nahi hai? Direct call karein: +91 9731001477</p>
                 </motion.form>
               )}
             </AnimatePresence>

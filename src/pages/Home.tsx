@@ -38,7 +38,7 @@ export default function Home() {
                 </Link>
               </motion.div>
               <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                <a href="tel:+919999999999" className="inline-block border border-white/50 px-6 py-4 text-sm font-bold hover:bg-white hover:text-[var(--ink)] transition">
+                <a href="tel:+919731001477" className="inline-block border border-white/50 px-6 py-4 text-sm font-bold hover:bg-white hover:text-[var(--ink)] transition">
                   Phone se baat karein
                 </a>
               </motion.div>
@@ -140,7 +140,7 @@ export default function Home() {
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
           aria-label="Call Sunward Solar"
-          href="tel:+919999999999"
+          href="tel:+919731001477"
           className="grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-lg text-white shadow-xl sm:h-14 sm:w-14 sm:text-xl"
         >
           ☎

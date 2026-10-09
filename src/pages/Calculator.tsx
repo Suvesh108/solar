@@ -6,10 +6,21 @@ import { PageLayout } from "@/components/site-shell";
 export default function Calculator() {
   const [bill, setBill] = useState<string | number>(5000);
   const [userKw, setUserKw] = useState<string | number>(3);
-  const [property, setProperty] = useState("House");
+  const [property, setProperty] = useState("House / Ghar");
   const [tariff, setTariff] = useState<string | number>(7);
   const [costPerKw, setCostPerKw] = useState<string | number>(55000);
-  const [subsidy, setSubsidy] = useState<string | number>(78000);
+  const [subsidy, setSubsidy] = useState<string | number>(98000);
+
+  const getAutoSubsidy = (kwVal: number, propType: string) => {
+    if (propType.includes("Commercial") || propType.includes("Office") || propType.includes("Industrial")) {
+      return 0;
+    }
+    if (kwVal <= 0) return 0;
+    if (kwVal >= 3) return 98000;
+    if (kwVal >= 2) return 80000;
+    if (kwVal >= 1) return 40000;
+    return Math.round(kwVal * 40000);
+  };
 
   const numericBill = typeof bill === "number" ? bill : (Number(bill) || 0);
   const numericTariff = typeof tariff === "number" ? tariff : (Number(tariff) || 7);
@@ -52,8 +63,10 @@ export default function Calculator() {
     if (nBill > 0) {
       const recKw = Math.max(1, Math.ceil((nBill / safeTariff) / GENERATION_PER_KW_MONTH));
       setUserKw(recKw);
+      setSubsidy(getAutoSubsidy(recKw, property));
     } else {
       setUserKw(0);
+      setSubsidy(0);
     }
   };
 
@@ -64,9 +77,16 @@ export default function Calculator() {
     if (nKw > 0) {
       const estimatedBill = Math.round(nKw * GENERATION_PER_KW_MONTH * safeTariff);
       setBill(estimatedBill);
+      setSubsidy(getAutoSubsidy(nKw, property));
     } else {
       setBill(0);
+      setSubsidy(0);
     }
+  };
+
+  const handlePropertyChange = (newProp: string) => {
+    setProperty(newProp);
+    setSubsidy(getAutoSubsidy(Number(userKw) || 0, newProp));
   };
 
   return (
@@ -155,7 +175,7 @@ export default function Calculator() {
                   Property type / Jagah
                   <select
                     value={property}
-                    onChange={(event) => setProperty(event.target.value)}
+                    onChange={(event) => handlePropertyChange(event.target.value)}
                     className="mt-1.5 w-full border border-white/20 bg-[var(--ink)] p-2 text-xs sm:text-sm text-white outline-none"
                   >
                     <option className="text-white bg-[var(--ink)]">House / Ghar</option>

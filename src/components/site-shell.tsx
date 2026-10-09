@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "motion/react";
 
-const WHATSAPP_NUMBER = "919999999999";
+const WHATSAPP_NUMBER = "919731001477";
 
 export function whatsappUrl(message = "Hi, I'm interested in a free solar assessment for my property.") {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
@@ -24,7 +24,7 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
           <Link to="/contact">Contact</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <a href="tel:+919999999999" className="hidden border border-current/40 px-3 py-2 text-sm font-bold sm:block">
+          <a href="tel:+919731001477" className="hidden border border-current/40 px-3 py-2 text-sm font-bold sm:block">
             Call us
           </a>
           <Link
@@ -86,10 +86,10 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
                 <span className="text-xs text-[var(--muted)]">→</span>
               </Link>
               <a
-                href="tel:+919999999999"
+                href="tel:+919731001477"
                 className="mt-2 flex items-center justify-center gap-2 bg-[var(--sun)] py-3 text-center text-sm font-bold text-[var(--ink)] transition hover:bg-white"
               >
-                <span>☎ Call us: +91 99999 99999</span>
+                <span>☎ Call us: +91 9731001477</span>
               </a>
             </nav>
           </motion.div>
@@ -113,8 +113,8 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="flex flex-col gap-3 text-sm">
-          <a href="tel:+919999999999" className="text-[var(--sun)] font-medium">
-            Call us: +91 99999 99999
+          <a href="tel:+919731001477" className="text-[var(--sun)] font-medium">
+            Call us: +91 9731001477
           </a>
           <a href={whatsappUrl()} target="_blank" rel="noreferrer" className="text-white/70 hover:text-white transition">
             WhatsApp us ↗
@@ -177,7 +177,7 @@ export function PageLayout({
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.92 }}
           aria-label="Call Sunward Solar"
-          href="tel:+919999999999"
+          href="tel:+919731001477"
           className="grid h-12 w-12 place-items-center rounded-full bg-[var(--ink)] text-white shadow-xl sm:h-14 sm:w-14"
         >
           <PhoneIcon className="w-5 h-5 sm:w-6 sm:h-6" />

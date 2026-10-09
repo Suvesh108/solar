@@ -53,3 +53,4 @@ solar_app/android/local.properties
 solar_app/android/.gradle/
 solar_app/android/app/build/
 solar_app/android/build/
+solar_app/android/app/sunward-release.jks

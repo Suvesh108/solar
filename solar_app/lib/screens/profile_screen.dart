@@ -106,8 +106,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         case UpdateCheckStatus.error:
           _availableUpdate = null;
           _updateStatusMessage = lang.t(
-            'Could not check for update: ${result.errorMessage ?? "Network error"}. Check internet connection.',
-            'अपडेट की जांच नहीं हो सकी: ${result.errorMessage ?? "नेटवर्क त्रुटि"}। कृपया इंटरनेट जांचें।',
+            'Could not auto-connect to GitHub server. You can download the latest APK directly below.',
+            'सर्वर से स्वतः संपर्क नहीं हो सका। आप नीचे दिए बटन से नया APK सीधे डाउनलोड कर सकते हैं।',
           );
           break;
       }
@@ -372,6 +372,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               onPressed: _isCheckingUpdate ? null : _checkForUpdates,
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 38,
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(foregroundColor: AppColors.teal),
+                              icon: const Icon(Icons.open_in_browser, size: 18),
+                              label: Text(
+                                lang.t('Download Latest APK Directly (Browser)', 'नया APK ब्राउज़र से सीधे डाउनलोड करें'),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              onPressed: () => UpdateService.openManualDownloadUrl(UpdateService.latestDirectApkUrl),
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -398,8 +412,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             child: Icon(Icons.phone, color: AppColors.ink, size: 20),
                           ),
                           title: Text(lang.t('Call Helpline', 'हेल्पलाइन कॉल करें'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: const Text('+91 99999 99999 (Toll Free)', style: TextStyle(fontSize: 12)),
-                          onTap: () => launchUrl(Uri.parse('tel:919999999999')),
+                          subtitle: const Text('+91 9731001477', style: TextStyle(fontSize: 12)),
+                          onTap: () => launchUrl(Uri.parse('tel:9731001477')),
                         ),
                         const Divider(height: 1),
                         ListTile(
@@ -411,7 +425,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: Text(lang.t('WhatsApp Advisor', 'व्हाट्सऐप पर संपर्क करें'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                           subtitle: Text(lang.t('Chat with Solar Advisor', 'सोलर सलाहकार से चैट करें'), style: const TextStyle(fontSize: 12)),
                           onTap: () => launchUrl(
-                            Uri.parse('https://wa.me/919999999999?text=${Uri.encodeComponent("Namaste Sunward Team, need solar help.")}'),
+                            Uri.parse('https://wa.me/919731001477?text=${Uri.encodeComponent("Namaste Sunward Team, need solar help.")}'),
                             mode: LaunchMode.externalApplication,
                           ),
                         ),

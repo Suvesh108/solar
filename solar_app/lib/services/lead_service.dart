@@ -26,43 +26,9 @@ class LeadService {
       }
     }
 
-    // Seed default sample leads for instant demonstration
-    final initialSample = [
-      Lead(
-        id: _uuid.v4(),
-        name: 'Ramesh Kulkarni',
-        phone: '9822012345',
-        location: 'Kothrud, Pune',
-        monthlyBill: '4500',
-        propertyType: 'Independent House',
-        status: LeadStatus.siteVisit,
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-      ),
-      Lead(
-        id: _uuid.v4(),
-        name: 'Sneha Patil',
-        phone: '9890123456',
-        location: 'Gangapur Road, Nashik',
-        monthlyBill: '8200',
-        propertyType: 'Row House',
-        status: LeadStatus.newLead,
-        createdAt: DateTime.now().subtract(const Duration(hours: 12)),
-      ),
-      Lead(
-        id: _uuid.v4(),
-        name: 'Pravin Deshmukh',
-        phone: '9765432109',
-        location: 'MIDC, Satara',
-        monthlyBill: '18500',
-        propertyType: 'Commercial Dukaan',
-        status: LeadStatus.quotation,
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      ),
-    ];
-
-    leadsNotifier.value = initialSample;
-    await _persist(initialSample);
-  }
+      leadsNotifier.value = [];
+      await _persist([]);
+    }
 
   Future<Lead> addLead({
     required String name,
