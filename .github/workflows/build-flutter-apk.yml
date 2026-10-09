@@ -85,17 +85,21 @@ jobs:
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK="Sunward.apk"
           cp "$APK_PATH" "$OUT_APK"
-          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
-            echo "Deleting existing release $TAG_NAME to ensure clean single-APK release..."
-            gh release delete "$TAG_NAME" -y || true
-          fi
-          gh release create "$TAG_NAME" "$OUT_APK" \
-            --title "$TAG_NAME - Sunward Solar App Update" \
-            --notes "### Sunward Solar $TAG_NAME Updates
+
+          cat << 'EOF' > release_notes.md
+### Sunward Solar v0.0.9 Updates
 
 - **Unified Solar Setup & Pricing**: Capacity-based turnkey pricing (Residential @ ₹70,000/kW, Commercial @ ₹50,000/kW).
 - **On-Grid vs Hybrid Selection**: Dynamic battery bank integration with manual pricing and voltage options (24V / 48V).
 - **Clean Responsive Layout**: Fixed button truncation and refined typography (14–18px bold) for effortless readability.
 - **Pure English Interface**: Simple, professional English throughout.
 - **Custom Sunward Dropdown System**: Smooth custom animated selection cards for Property Type and all selectors.
-- **Rebuilt In-App Updater**: Direct GitHub releases integration with seamless in-app download and package installation."
+- **Rebuilt In-App Updater**: Direct GitHub releases integration with seamless in-app download and package installation.
+EOF
+
+          if gh release view "$TAG_NAME" > /dev/null 2>&1; then
+            echo "Deleting existing release $TAG_NAME to ensure clean single-APK release..."
+            gh release delete "$TAG_NAME" -y || true
+          fi
+
+          gh release create "$TAG_NAME" "$OUT_APK" --title "$TAG_NAME - Sunward Solar App Update" --notes-file release_notes.md
