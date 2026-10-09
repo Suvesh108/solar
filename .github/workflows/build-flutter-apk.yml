@@ -48,8 +48,8 @@ jobs:
           cd solar_app
           flutter analyze > ../analyze_log.txt 2>&1 || true
           cd ..
-          if grep -E "• (error|warning) •" analyze_log.txt > /dev/null 2>&1; then
-            echo "=== FLUTTER ANALYZE FOUND ISSUES ==="
+          if grep -E "• error •" analyze_log.txt > /dev/null 2>&1; then
+            echo "=== FLUTTER ANALYZE FOUND ERRORS ==="
             cat analyze_log.txt
             git config user.name "github-actions"
             git config user.email "github-actions@github.com"

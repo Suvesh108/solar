@@ -8,6 +8,75 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class QuoteShareService {
+  static String formatWhatsAppQuote({
+    required String customerName,
+    required String phone,
+    required String location,
+    required String propertyType,
+    required double kw,
+    required int plateCount,
+    required double platePrice,
+    required double totalPlatesCost,
+    required double installCost,
+    required double inverterWiringCost,
+    required double totalSystemCost,
+    required double subsidy,
+    required double netPayable,
+    required double monthlySavings,
+    required double annualSavings,
+    required String paybackYears,
+    required double profit25Years,
+    double? loanAmount,
+    double? emiAmount,
+    int? loanYears,
+  }) {
+    final hasLoan = (loanAmount != null && loanAmount > 0 && emiAmount != null && emiAmount > 0);
+
+    final loanSection = hasLoan
+        ? '''
+🏦 *BANK LOAN & EASY EMI (किश्त हिसाब):*
+• Sanctioned Loan: ₹${loanAmount.round()} ($loanYears Yrs)
+• Monthly EMI (किश्त): ₹${emiAmount.round()} / month
+• Monthly Savings: ₹${monthlySavings.round()} / month
+${monthlySavings >= emiAmount ? '★ Savings fully covers your EMI!' : '★ Net EMI difference: ₹${(emiAmount - monthlySavings).round()} / mo'}
+'''
+        : '';
+
+    return '''
+☀️ *SUNWARD SOLAR — OFFICIAL ROOFTOP ESTIMATE* ☀️
+━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *Customer:* $customerName
+📞 *Contact:* $phone
+📍 *Location:* $location
+🏠 *Property:* $propertyType
+
+⚡ *SYSTEM SPECIFICATIONS:*
+• Solar Capacity: ${kw.toStringAsFixed(1)} kW System
+• Solar Plates: $plateCount Plates (540W Mono PERC)
+• Daily Generation: ~${(kw * 4).round()} Units / day
+• Monthly Generation: ~${(kw * 120).round()} Units / month
+• Rooftop Area: ~${(kw * 100).round()} sq. ft.
+
+💰 *COST BREAKDOWN (HISAAB):*
+• Solar Plates Cost ($plateCount × ₹${platePrice.round()}): ₹${totalPlatesCost.round()}
+• Fitting & Structure: ₹${installCost.round()}
+• Inverter & Wiring: ₹${inverterWiringCost.round()}
+─────────────────────────
+• *Total System Cost:* ₹${totalSystemCost.round()}
+• *Govt Subsidy Discount:* -₹${subsidy.round()}
+★ *FINAL AMOUNT TO PAY:* ₹${netPayable.round()}
+$loanSection
+📈 *SAVINGS & RETURN:*
+• Monthly Bill Saved: ~₹${monthlySavings.round()} / month
+• Annual Bill Saved: ~₹${annualSavings.round()} / year
+• Payback Period: $paybackYears Years
+• 25-Year Estimated Profit: ₹${profit25Years.round()}
+
+📞 *Sunward Solar Helpline:* +91 9731001477
+━━━━━━━━━━━━━━━━━━━━━━━━━
+''';
+  }
+
   static Future<bool> openWhatsApp({
     required String phone,
     required String message,
