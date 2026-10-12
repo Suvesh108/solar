@@ -25,10 +25,11 @@ def setup_android():
     file_paths_xml = os.path.join(xml_dir, "file_paths.xml")
     with open(file_paths_xml, "w", encoding="utf-8") as f:
         f.write("""<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path name="cache" path="." />
+<paths>
     <external-cache-path name="external_cache" path="." />
-    <files-path name="files" path="." />
+    <cache-path name="internal_cache" path="." />
+    <files-path name="internal_files" path="." />
+    <external-files-path name="external_files" path="." />
 </paths>
 """)
     print("Ensured file_paths.xml exists for FileProvider.")
@@ -41,6 +42,7 @@ def setup_android():
 
         permissions = """
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <queries>
         <intent>
@@ -63,7 +65,15 @@ def setup_android():
         <package android:name="com.whatsapp.w4b" />
     </queries>
 """
+        # Clean any dangerous/obsolete permissions
+        content = re.sub(r'<uses-permission\s+android:name="android\.permission\.CALL_PHONE"[^>]*/>\s*', '', content)
+        content = re.sub(r'<uses-permission\s+android:name="android\.permission\.READ_EXTERNAL_STORAGE"[^>]*/>\s*', '', content)
+        content = re.sub(r'<uses-permission\s+android:name="android\.permission\.READ_MEDIA_[^"]*"[^>]*/>\s*', '', content)
+
         content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward"', content)
+        if 'android:usesCleartextTraffic' not in content:
+            content = content.replace('<application', '<application\n        android:usesCleartextTraffic="true"')
+
         if "<queries>" not in content:
             content = content.replace("<application", permissions + "\n    <application")
 
@@ -84,7 +94,7 @@ def setup_android():
             f.write(content)
         print("Configured Sunward app label, permissions, queries, and FileProvider in AndroidManifest.xml.")
 
-    # 4. Inject native MethodChannel into MainActivity.kt (WhatsApp direct JID dispatch)
+    # 4. Inject native MethodChannel into MainActivity.kt
     kotlin_root = os.path.join(android_app_dir, "src", "main", "kotlin")
     if os.path.exists(kotlin_root):
         for root, _, files in os.walk(kotlin_root):
@@ -100,10 +110,10 @@ def setup_android():
 
                 kotlin_code = f"""{pkg_line}
 
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -186,73 +196,42 @@ class MainActivity: FlutterActivity() {{
                         result.error("SEND_ERROR", e.localizedMessage, null)
                     }}
                 }}
-                "canRequestPackageInstalls" -> {{
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
-                        result.success(packageManager.canRequestPackageInstalls())
-                    }} else {{
-                        result.success(true)
-                    }}
-                }}
-                "openInstallPermissionSettings" -> {{
-                    try {{
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {{
-                            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {{
-                                data = Uri.parse("package:${{applicationContext.packageName}}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }}
-                            startActivity(intent)
-                            result.success(true)
-                        }} else {{
-                            result.success(true)
-                        }}
-                    }} catch (e: Exception) {{
-                        result.error("SETTINGS_ERROR", e.localizedMessage, null)
-                    }}
-                }}
                 "installApk" -> {{
                     val filePath = call.argument<String>("filePath")
-                    if (filePath == null) {{
-                        result.error("INVALID_PATH", "File path cannot be null", null)
-                        return@setMethodCallHandler
-                    }}
-
-                    try {{
-                        val file = File(filePath)
-                        if (!file.exists()) {{
-                            result.error("FILE_NOT_FOUND", "File does not exist: $filePath", null)
-                            return@setMethodCallHandler
-                        }}
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {{
-                            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {{
-                                data = Uri.parse("package:${{applicationContext.packageName}}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (filePath != null) {{
+                        try {{
+                            val file = File(filePath)
+                            if (!file.exists()) {{
+                                result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
+                                return@setMethodCallHandler
                             }}
-                            startActivity(settingsIntent)
-                            result.error("PERMISSION_REQUIRED", "Unknown sources permission required. Please allow and retry install.", null)
-                            return@setMethodCallHandler
+                            val context = applicationContext
+                            val uri: Uri = FileProvider.getUriForFile(
+                                context,
+                                "${{context.packageName}}.fileprovider",
+                                file
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW).apply {{
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                            }}
+                            val resInfoList = context.packageManager.queryIntentActivities(
+                                intent,
+                                PackageManager.MATCH_DEFAULT_ONLY
+                            )
+                            for (resolveInfo in resInfoList) {{
+                                val packageName = resolveInfo.activityInfo.packageName
+                                context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }}
+                            context.startActivity(intent)
+                            result.success(true)
+                        }} catch (e: Exception) {{
+                            result.error("INSTALL_ERROR", e.localizedMessage, null)
                         }}
-
-                        val contentUri = FileProvider.getUriForFile(
-                            this,
-                            "${{applicationContext.packageName}}.fileprovider",
-                            file
-                        )
-
-                        val intent = Intent(Intent.ACTION_VIEW).apply {{
-                            setDataAndType(contentUri, "application/vnd.android.package-archive")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, applicationContext.packageName)
-                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                        }}
-
-                        startActivity(intent)
-                        result.success(true)
-                    }} catch (e: Exception) {{
-                        result.error("INSTALL_ERROR", e.localizedMessage, null)
+                    }} else {{
+                        result.error("INVALID_PATH", "Path is null", null)
                     }}
                 }}
                 else -> result.notImplemented()
@@ -263,7 +242,7 @@ class MainActivity: FlutterActivity() {{
 """
                 with open(main_activity_file, "w", encoding="utf-8") as f:
                     f.write(kotlin_code)
-                print(f"Configured MainActivity.kt with WhatsApp MethodChannel at {main_activity_file}")
+                print(f"Configured MainActivity.kt with Settlr-grade MethodChannel at {main_activity_file}")
                 break
 
     # 5. Configure Signing in build.gradle.kts or build.gradle
@@ -295,14 +274,15 @@ class MainActivity: FlutterActivity() {{
     }
 """
         if 'signingConfigs {' not in gradle_text:
-            gradle_text = gradle_text.replace("android {", "android {" + signing_code)
-            gradle_text = gradle_text.replace(
-                'signingConfig = signingConfigs.getByName("debug")',
-                'signingConfig = signingConfigs.getByName("release")'
-            )
-            with open(app_gradle_kts, "w", encoding="utf-8") as f:
-                f.write(gradle_text)
-            print("Configured release signing in build.gradle.kts.")
+            gradle_text = re.sub(r'(android\s*\{)', r'\1' + signing_code, gradle_text, count=1)
+        gradle_text = re.sub(
+            r'buildTypes\s*\{\s*release\s*\{[^}]*\}',
+            'buildTypes {\n        release {\n            signingConfig = signingConfigs.getByName("release")\n            isMinifyEnabled = false\n            isShrinkResources = false\n        }',
+            gradle_text
+        )
+        with open(app_gradle_kts, "w", encoding="utf-8") as f:
+            f.write(gradle_text)
+        print("Configured release signing and build types in build.gradle.kts.")
 
     elif os.path.exists(app_gradle):
         with open(app_gradle, "r", encoding="utf-8") as f:
@@ -323,14 +303,15 @@ class MainActivity: FlutterActivity() {{
     }
 """
         if 'signingConfigs {' not in gradle_text:
-            gradle_text = gradle_text.replace("android {", "android {" + signing_code)
-            gradle_text = gradle_text.replace(
-                "signingConfig signingConfigs.debug",
-                "signingConfig signingConfigs.release"
-            )
-            with open(app_gradle, "w", encoding="utf-8") as f:
-                f.write(gradle_text)
-            print("Configured release signing in build.gradle.")
+            gradle_text = re.sub(r'(android\s*\{)', r'\1' + signing_code, gradle_text, count=1)
+        gradle_text = re.sub(
+            r'buildTypes\s*\{\s*release\s*\{[^}]*\}',
+            'buildTypes {\n        release {\n            signingConfig signingConfigs.release\n            minifyEnabled false\n            shrinkResources false\n        }',
+            gradle_text
+        )
+        with open(app_gradle, "w", encoding="utf-8") as f:
+            f.write(gradle_text)
+        print("Configured release signing and build types in build.gradle.")
 
 if __name__ == "__main__":
     setup_android()

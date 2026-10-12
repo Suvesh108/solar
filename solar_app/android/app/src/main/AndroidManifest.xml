@@ -27,6 +27,7 @@
 
 
     <application
+        android:usesCleartextTraffic="true"
         android:label="Sunward"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

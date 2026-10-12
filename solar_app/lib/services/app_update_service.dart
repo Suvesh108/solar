@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -58,7 +57,7 @@ class AppUpdateResult {
 }
 
 class AppUpdateService {
-  static const String currentVersion = 'v0.1.2';
+  static const String currentVersion = 'v0.1.3';
   static const String githubOwner = 'Suvesh108';
   static const String githubRepo = 'solar';
 
@@ -94,7 +93,7 @@ class AppUpdateService {
       final rawResult = await _checkRawFallback(client);
       if (rawResult != null) return rawResult;
 
-      return AppUpdateResult(
+      return const AppUpdateResult(
         status: AppUpdateStatus.error,
         release: AppReleaseInfo(
           version: currentVersion,
@@ -111,7 +110,7 @@ class AppUpdateService {
       debugPrint('[AppUpdateService] Check update error: $e');
       return AppUpdateResult(
         status: AppUpdateStatus.error,
-        release: AppReleaseInfo(
+        release: const AppReleaseInfo(
           version: currentVersion,
           title: '$currentVersion - Sunward Solar App',
           notes: 'Standard release package.',
@@ -318,122 +317,55 @@ class AppUpdateService {
     required void Function(double progress) onProgress,
   }) async {
     if (kIsWeb) {
-      // On web, direct user to download link
       await openUrl(apkUrl);
       return null;
     }
 
-    HttpClient? client;
-    IOSink? sink;
-    File? apkFile;
+    final tempDir = await getTemporaryDirectory();
+    final apkFile = File('${tempDir.path}/sunward_update.apk');
 
-    try {
-      Directory? targetDir;
+    if (await apkFile.exists()) {
       try {
-        final extDirs = await getExternalCacheDirectories();
-        if (extDirs != null && extDirs.isNotEmpty) {
-          targetDir = extDirs.first;
-        }
+        await apkFile.delete();
       } catch (_) {}
-      targetDir ??= await getTemporaryDirectory();
+    }
 
-      apkFile = File('${targetDir.path}/Sunward.apk');
-      if (await apkFile.exists()) {
-        try {
-          await apkFile.delete();
-        } catch (_) {}
-      }
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(apkUrl));
+      request.headers['User-Agent'] = 'SunwardSolar-App/$currentVersion';
+      request.headers['Accept'] = '*/*';
 
-      client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 30)
-        ..idleTimeout = const Duration(seconds: 30);
-
-      Uri currentUri = Uri.parse(apkUrl);
-      HttpClientResponse? finalResponse;
-
-      // Follow HTTP 301/302 redirects with stream draining
-      for (int redirectCount = 0; redirectCount < 10; redirectCount++) {
-        final request = await client.getUrl(currentUri);
-        request.followRedirects = false;
-        request.headers.set(
-          HttpHeaders.userAgentHeader,
-          'Mozilla/5.0 (Linux; Android 14; Mobile; SunwardSolar/$currentVersion)',
-        );
-        request.headers.set(HttpHeaders.acceptHeader, '*/*');
-
-        final response = await request.close();
-
-        if (response.isRedirect) {
-          final location = response.headers.value(HttpHeaders.locationHeader);
-          if (location != null) {
-            currentUri = currentUri.resolve(location);
-            await response.drain();
-            continue;
-          }
-        }
-
-        finalResponse = response;
-        break;
-      }
-
-      if (finalResponse == null || finalResponse.statusCode != 200) {
-        debugPrint('[AppUpdateService] Download failed: ${finalResponse?.statusCode}');
+      final response = await client.send(request);
+      if (response.statusCode != 200) {
+        debugPrint('[AppUpdateService] Download failed: ${response.statusCode}');
         return null;
       }
 
-      final totalBytes = finalResponse.contentLength;
-      sink = apkFile.openWrite();
+      final totalBytes = response.contentLength ?? 0;
       int receivedBytes = 0;
 
-      await for (final chunk in finalResponse) {
+      final sink = apkFile.openWrite();
+      await for (final chunk in response.stream) {
         sink.add(chunk);
         receivedBytes += chunk.length;
         if (totalBytes > 0) {
           onProgress((receivedBytes / totalBytes).clamp(0.0, 1.0));
+        } else {
+          onProgress(0.0);
         }
       }
-
       await sink.flush();
       await sink.close();
-      sink = null;
 
-      // Trigger Android installer
-      bool nativeInstalled = false;
-      try {
-        const platform = MethodChannel('com.sunward.solar/whatsapp');
-        if (!kIsWeb && Platform.isAndroid) {
-          final canInstall = await platform.invokeMethod<bool>('canRequestPackageInstalls');
-          if (canInstall == false) {
-            await platform.invokeMethod('openInstallPermissionSettings');
-            return apkFile;
-          }
-        }
-
-        final res = await platform.invokeMethod<bool>(
-          'installApk',
-          {'filePath': apkFile.path},
-        );
-        if (res == true) nativeInstalled = true;
-      } catch (e) {
-        debugPrint('[AppUpdateService] Native install error: $e');
-      }
-
-      if (!nativeInstalled) {
-        await OpenFilex.open(
-          apkFile.path,
-          type: 'application/vnd.android.package-archive',
-        );
-      }
-
+      const platform = MethodChannel('com.sunward.solar/whatsapp');
+      await platform.invokeMethod('installApk', {'filePath': apkFile.path});
       return apkFile;
     } catch (e) {
       debugPrint('[AppUpdateService] Download error: $e');
-      try {
-        await sink?.close();
-      } catch (_) {}
       return null;
     } finally {
-      client?.close();
+      client.close();
     }
   }
 

@@ -1,9 +1,9 @@
 package com.sunward.solar
 
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -86,73 +86,42 @@ class MainActivity: FlutterActivity() {
                         result.error("SEND_ERROR", e.localizedMessage, null)
                     }
                 }
-                "canRequestPackageInstalls" -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        result.success(packageManager.canRequestPackageInstalls())
-                    } else {
-                        result.success(true)
-                    }
-                }
-                "openInstallPermissionSettings" -> {
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                data = Uri.parse("package:${applicationContext.packageName}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            startActivity(intent)
-                            result.success(true)
-                        } else {
-                            result.success(true)
-                        }
-                    } catch (e: Exception) {
-                        result.error("SETTINGS_ERROR", e.localizedMessage, null)
-                    }
-                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
-                    if (filePath == null) {
-                        result.error("INVALID_PATH", "File path cannot be null", null)
-                        return@setMethodCallHandler
-                    }
-
-                    try {
-                        val file = File(filePath)
-                        if (!file.exists()) {
-                            result.error("FILE_NOT_FOUND", "File does not exist: $filePath", null)
-                            return@setMethodCallHandler
-                        }
-
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
-                            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                                data = Uri.parse("package:${applicationContext.packageName}")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    if (filePath != null) {
+                        try {
+                            val file = File(filePath)
+                            if (!file.exists()) {
+                                result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
+                                return@setMethodCallHandler
                             }
-                            startActivity(settingsIntent)
-                            result.error("PERMISSION_REQUIRED", "Unknown sources permission required. Please allow and retry install.", null)
-                            return@setMethodCallHandler
+                            val context = applicationContext
+                            val uri: Uri = FileProvider.getUriForFile(
+                                context,
+                                "${context.packageName}.fileprovider",
+                                file
+                            )
+                            val intent = Intent(Intent.ACTION_VIEW).apply {
+                                setDataAndType(uri, "application/vnd.android.package-archive")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                            }
+                            val resInfoList = context.packageManager.queryIntentActivities(
+                                intent,
+                                PackageManager.MATCH_DEFAULT_ONLY
+                            )
+                            for (resolveInfo in resInfoList) {
+                                val packageName = resolveInfo.activityInfo.packageName
+                                context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            }
+                            context.startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("INSTALL_ERROR", e.localizedMessage, null)
                         }
-
-                        val contentUri = FileProvider.getUriForFile(
-                            this,
-                            "${applicationContext.packageName}.fileprovider",
-                            file
-                        )
-
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(contentUri, "application/vnd.android.package-archive")
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, applicationContext.packageName)
-                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
-                        }
-
-                        startActivity(intent)
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.error("INSTALL_ERROR", e.localizedMessage, null)
+                    } else {
+                        result.error("INVALID_PATH", "Path is null", null)
                     }
                 }
                 else -> result.notImplemented()

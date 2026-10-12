@@ -12,13 +12,14 @@ void main() {
   });
 
   test('isVersionNewer logic tests', () {
-    expect(AppUpdateService.isVersionNewer('v0.1.3', 'v0.1.2'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.2.0', 'v0.1.2'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v1.0.0', 'v0.1.2'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.1.2', 'v0.1.2'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.1.1', 'v0.1.2'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.1.0', 'v0.1.2'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.0.9', 'v0.1.2'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.4', 'v0.1.3'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v0.2.0', 'v0.1.3'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v1.0.0', 'v0.1.3'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v0.1.3', 'v0.1.3'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.2', 'v0.1.3'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.1', 'v0.1.3'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.0', 'v0.1.3'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.0.9', 'v0.1.3'), isFalse);
   });
 
   test('AppReleaseInfo formattedSize tests', () {
