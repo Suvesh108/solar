@@ -58,7 +58,7 @@ class AppUpdateResult {
 }
 
 class AppUpdateService {
-  static const String currentVersion = 'v0.0.9';
+  static const String currentVersion = 'v0.1.1';
   static const String githubOwner = 'Suvesh108';
   static const String githubRepo = 'solar';
 

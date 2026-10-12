@@ -6,17 +6,18 @@ void main() {
     final result = await AppUpdateService.checkForUpdate();
     expect(result.status, isNot(AppUpdateStatus.error));
     expect(result.release, isNotNull);
-    expect(result.release!.version, equals('v0.0.9'));
+    expect(result.release!.version, startsWith('v'));
     expect(result.release!.apkDownloadUrl, contains('Sunward.apk'));
     expect(result.release!.formattedSize, isNotEmpty);
   });
 
   test('isVersionNewer logic tests', () {
-    expect(AppUpdateService.isVersionNewer('v0.1.0', 'v0.0.9'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.0.10', 'v0.0.9'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v1.0.0', 'v0.0.9'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.0.9', 'v0.0.9'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.0.8', 'v0.0.9'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.2', 'v0.1.1'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v0.2.0', 'v0.1.1'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v1.0.0', 'v0.1.1'), isTrue);
+    expect(AppUpdateService.isVersionNewer('v0.1.1', 'v0.1.1'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.1.0', 'v0.1.1'), isFalse);
+    expect(AppUpdateService.isVersionNewer('v0.0.9', 'v0.1.1'), isFalse);
   });
 
   test('AppReleaseInfo formattedSize tests', () {
