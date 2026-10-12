@@ -44,36 +44,21 @@ jobs:
         run: flutter pub get
 
       - name: Analyze Flutter Code
+        working-directory: solar_app
         run: |
-          cd solar_app
-          flutter analyze > ../analyze_log.txt 2>&1 || true
-          cd ..
+          flutter analyze > analyze_log.txt 2>&1 || true
           if grep -E "• error •" analyze_log.txt > /dev/null 2>&1; then
             echo "=== FLUTTER ANALYZE FOUND ERRORS ==="
             cat analyze_log.txt
-            git config user.name "github-actions"
-            git config user.email "github-actions@github.com"
-            git checkout -B debug-log
-            git add analyze_log.txt
-            git commit -m "debug: analyze log" || true
-            git push -f origin debug-log || true
-            cd solar_app
-            flutter analyze
+            exit 1
           fi
 
       - name: Build Signed Release APK
         working-directory: solar_app
         run: |
-          if ! flutter build apk --release -v > ../build_log.txt 2>&1; then
+          if ! flutter build apk --release -v > build_log.txt 2>&1; then
             echo "=== FLUTTER BUILD RELEASE FAILED ==="
-            tail -n 150 ../build_log.txt
-            cd ..
-            git config user.name "github-actions"
-            git config user.email "github-actions@github.com"
-            git checkout -B debug-log
-            git add build_log.txt
-            git commit -m "debug: build log" || true
-            git push -f origin debug-log || true
+            tail -n 150 build_log.txt
             exit 1
           fi
 
