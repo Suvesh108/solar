@@ -1,11 +1,8 @@
 enum LeadStatus {
   newLead('New'),
   contacted('Contacted'),
-  qualified('Qualified'),
-  siteVisit('Site Visit'),
   quotation('Quotation'),
-  won('Won'),
-  lost('Lost');
+  interested('Interested');
 
   final String label;
   const LeadStatus(this.label);
@@ -14,6 +11,10 @@ enum LeadStatus {
     for (final s in LeadStatus.values) {
       if (s.label.toLowerCase() == val.toLowerCase()) return s;
     }
+    // Backward compatibility mappings
+    final lower = val.toLowerCase();
+    if (lower == 'won') return LeadStatus.interested;
+    if (lower == 'qualified' || lower == 'site visit') return LeadStatus.contacted;
     return LeadStatus.newLead;
   }
 }
@@ -26,6 +27,7 @@ class Lead {
   final String monthlyBill;
   final String propertyType;
   final LeadStatus status;
+  final bool isNotInterested;
   final DateTime createdAt;
 
   Lead({
@@ -36,6 +38,7 @@ class Lead {
     required this.monthlyBill,
     required this.propertyType,
     this.status = LeadStatus.newLead,
+    this.isNotInterested = false,
     required this.createdAt,
   });
 
@@ -47,21 +50,29 @@ class Lead {
         'monthlyBill': monthlyBill,
         'propertyType': propertyType,
         'status': status.label,
+        'isNotInterested': isNotInterested,
         'createdAt': createdAt.toIso8601String(),
       };
 
-  factory Lead.fromJson(Map<String, dynamic> json) => Lead(
-        id: json['id'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        phone: json['phone'] as String? ?? '',
-        location: json['location'] as String? ?? '',
-        monthlyBill: json['monthlyBill']?.toString() ?? '',
-        propertyType: json['propertyType'] as String? ?? 'House',
-        status: LeadStatus.fromString(json['status'] as String? ?? 'New'),
-        createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
-            : DateTime.now(),
-      );
+  factory Lead.fromJson(Map<String, dynamic> json) {
+    final statusStr = json['status'] as String? ?? 'New';
+    final wasLost = statusStr.toLowerCase() == 'lost';
+    final notInterested = json['isNotInterested'] == true || wasLost;
+
+    return Lead(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      location: json['location'] as String? ?? '',
+      monthlyBill: json['monthlyBill']?.toString() ?? '',
+      propertyType: json['propertyType'] as String? ?? 'House',
+      status: LeadStatus.fromString(statusStr),
+      isNotInterested: notInterested,
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 
   Lead copyWith({
     String? id,
@@ -71,6 +82,7 @@ class Lead {
     String? monthlyBill,
     String? propertyType,
     LeadStatus? status,
+    bool? isNotInterested,
     DateTime? createdAt,
   }) {
     return Lead(
@@ -81,6 +93,7 @@ class Lead {
       monthlyBill: monthlyBill ?? this.monthlyBill,
       propertyType: propertyType ?? this.propertyType,
       status: status ?? this.status,
+      isNotInterested: isNotInterested ?? this.isNotInterested,
       createdAt: createdAt ?? this.createdAt,
     );
   }

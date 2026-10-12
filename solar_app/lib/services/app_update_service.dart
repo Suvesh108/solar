@@ -25,6 +25,12 @@ class AppReleaseInfo {
     required this.releasePageUrl,
     this.publishedAt,
   });
+
+  String get formattedSize {
+    if (apkSizeBytes <= 0) return '51.7 MB';
+    final mb = apkSizeBytes / (1024 * 1024);
+    return '${mb.toStringAsFixed(1)} MB';
+  }
 }
 
 enum AppUpdateStatus {
@@ -61,28 +67,58 @@ class AppUpdateService {
   static const String defaultDirectApkUrl =
       'https://github.com/$githubOwner/$githubRepo/releases/download/$currentVersion/Sunward.apk';
 
-  /// Check GitHub releases API for newer versions
+  static Map<String, String> _getHeaders() {
+    final map = <String, String>{
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    if (!kIsWeb) {
+      map['User-Agent'] = 'SunwardSolar-App/$currentVersion';
+    }
+    return map;
+  }
+
+  /// Check GitHub releases API for newer versions with multi-layer fallback
   static Future<AppUpdateResult> checkForUpdate() async {
     final client = http.Client();
 
     try {
-      // 1. Try /releases/latest endpoint
+      // 1. Try GitHub /releases/latest endpoint
       final latestResult = await _checkLatestEndpoint(client);
       if (latestResult != null) return latestResult;
 
-      // 2. Try /releases (list) endpoint fallback
+      // 2. Try GitHub /releases (list) endpoint fallback
       final listResult = await _checkListEndpoint(client);
       if (listResult != null) return listResult;
 
-      return const AppUpdateResult(
+      // 3. Try Raw GitHub manifest fallback (bypasses GitHub API rate limits completely)
+      final rawResult = await _checkRawFallback(client);
+      if (rawResult != null) return rawResult;
+
+      return AppUpdateResult(
         status: AppUpdateStatus.error,
+        release: AppReleaseInfo(
+          version: currentVersion,
+          title: '$currentVersion - Sunward Solar App',
+          notes: 'Standard release package.',
+          apkDownloadUrl: defaultDirectApkUrl,
+          apkSizeBytes: 54245959,
+          releasePageUrl: defaultReleasePageUrl,
+        ),
         currentVersion: currentVersion,
-        message: 'Could not connect to GitHub releases. Please check your internet or download manually.',
+        message: 'Could not connect to GitHub API. You can still download the APK directly below.',
       );
     } catch (e) {
       debugPrint('[AppUpdateService] Check update error: $e');
       return AppUpdateResult(
         status: AppUpdateStatus.error,
+        release: AppReleaseInfo(
+          version: currentVersion,
+          title: '$currentVersion - Sunward Solar App',
+          notes: 'Standard release package.',
+          apkDownloadUrl: defaultDirectApkUrl,
+          apkSizeBytes: 54245959,
+          releasePageUrl: defaultReleasePageUrl,
+        ),
         currentVersion: currentVersion,
         message: 'Network error checking for updates: $e',
       );
@@ -96,15 +132,14 @@ class AppUpdateService {
       final uri = Uri.parse('https://api.github.com/repos/$githubOwner/$githubRepo/releases/latest');
       final response = await client.get(
         uri,
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'SunwardSolar-App/$currentVersion',
-        },
+        headers: _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         return _parseReleaseMap(data);
+      } else {
+        debugPrint('[AppUpdateService] Latest endpoint returned status: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[AppUpdateService] Latest endpoint failed: $e');
@@ -117,10 +152,7 @@ class AppUpdateService {
       final uri = Uri.parse('https://api.github.com/repos/$githubOwner/$githubRepo/releases');
       final response = await client.get(
         uri,
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'SunwardSolar-App/$currentVersion',
-        },
+        headers: _getHeaders(),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -134,9 +166,67 @@ class AppUpdateService {
             }
           }
         }
+      } else {
+        debugPrint('[AppUpdateService] List endpoint returned status: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('[AppUpdateService] List endpoint failed: $e');
+    }
+    return null;
+  }
+
+  static Future<AppUpdateResult?> _checkRawFallback(http.Client client) async {
+    try {
+      final uri = Uri.parse('https://raw.githubusercontent.com/$githubOwner/$githubRepo/main/solar_app/pubspec.yaml');
+      final response = await client.get(uri).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final lines = response.body.split('\n');
+        String versionStr = '';
+        for (final line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.startsWith('version:')) {
+            versionStr = trimmed.replaceFirst('version:', '').trim();
+            final plusIdx = versionStr.indexOf('+');
+            if (plusIdx != -1) versionStr = versionStr.substring(0, plusIdx).trim();
+            break;
+          }
+        }
+
+        if (versionStr.isNotEmpty) {
+          final tag = versionStr.startsWith('v') ? versionStr : 'v$versionStr';
+
+          String notes = 'What\'s new in $tag:\n- Turnkey pricing\n- Simplified English layout\n- Rebuilt in-app update installer';
+          try {
+            final notesUri = Uri.parse('https://raw.githubusercontent.com/$githubOwner/$githubRepo/main/release_notes.md');
+            final notesRes = await client.get(notesUri).timeout(const Duration(seconds: 5));
+            if (notesRes.statusCode == 200 && notesRes.body.trim().isNotEmpty) {
+              notes = notesRes.body.trim();
+            }
+          } catch (_) {}
+
+          final release = AppReleaseInfo(
+            version: tag,
+            title: '$tag - Sunward Solar App Update',
+            notes: notes,
+            apkDownloadUrl: 'https://github.com/$githubOwner/$githubRepo/releases/download/$tag/Sunward.apk',
+            apkSizeBytes: 54245959,
+            releasePageUrl: 'https://github.com/$githubOwner/$githubRepo/releases/tag/$tag',
+            publishedAt: DateTime.now(),
+          );
+
+          final isNewer = isVersionNewer(tag, currentVersion);
+          return AppUpdateResult(
+            status: isNewer ? AppUpdateStatus.updateAvailable : AppUpdateStatus.upToDate,
+            release: release,
+            currentVersion: currentVersion,
+            latestVersion: tag,
+            message: isNewer ? 'New update $tag is available!' : 'You are on the latest version ($currentVersion).',
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[AppUpdateService] Raw fallback failed: $e');
     }
     return null;
   }

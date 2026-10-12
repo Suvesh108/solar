@@ -57,7 +57,19 @@ class LeadService {
   Future<void> updateStatus(String leadId, LeadStatus newStatus) async {
     final updated = leadsNotifier.value.map((l) {
       if (l.id == leadId) {
-        return l.copyWith(status: newStatus);
+        return l.copyWith(status: newStatus, isNotInterested: false);
+      }
+      return l;
+    }).toList();
+
+    leadsNotifier.value = updated;
+    await _persist(updated);
+  }
+
+  Future<void> markNotInterested(String leadId, {bool notInterested = true}) async {
+    final updated = leadsNotifier.value.map((l) {
+      if (l.id == leadId) {
+        return l.copyWith(isNotInterested: notInterested);
       }
       return l;
     }).toList();

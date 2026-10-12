@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/app_update_service.dart';
 import '../services/language_service.dart';
@@ -17,9 +18,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = 'Sunward User';
   bool _isCheckingUpdate = false;
   String _updateStatusMessage = '';
-  AppReleaseInfo? _availableUpdate;
+  AppReleaseInfo? _latestRelease;
+  AppUpdateStatus _updateStatus = AppUpdateStatus.idle;
   bool _isDownloading = false;
   double _downloadProgress = 0.0;
+  DateTime? _lastCheckedAt;
 
   @override
   void initState() {
@@ -77,8 +80,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _checkForUpdates() async {
     setState(() {
       _isCheckingUpdate = true;
+      _updateStatus = AppUpdateStatus.checking;
       _updateStatusMessage = 'Checking GitHub releases for latest version...';
-      _availableUpdate = null;
     });
 
     final result = await AppUpdateService.checkForUpdate();
@@ -87,18 +90,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() {
       _isCheckingUpdate = false;
+      _updateStatus = result.status;
+      _latestRelease = result.release;
+      _lastCheckedAt = DateTime.now();
+
       switch (result.status) {
         case AppUpdateStatus.updateAvailable:
-          _availableUpdate = result.release;
-          _updateStatusMessage = 'New version ${result.release!.version} is available!';
+          _updateStatusMessage = 'New version ${result.release?.version ?? result.latestVersion} is available!';
           break;
         case AppUpdateStatus.upToDate:
-          _availableUpdate = null;
-          _updateStatusMessage = 'Great! You already have the latest version (${result.currentVersion}).';
+          _updateStatusMessage = 'You are already running the latest version (${result.currentVersion}).';
           break;
         case AppUpdateStatus.error:
-          _availableUpdate = null;
-          _updateStatusMessage = result.message ?? 'Could not connect to GitHub. You can download the latest APK below.';
+          _updateStatusMessage = result.message ?? 'Could not connect to GitHub. You can still download the APK below.';
           break;
         case AppUpdateStatus.idle:
         case AppUpdateStatus.checking:
@@ -108,6 +112,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _startInAppDownload(AppReleaseInfo update) async {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.teal,
+          content: Text('Starting download for ${update.version} (${update.formattedSize})...'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      await AppUpdateService.openUrl(update.apkDownloadUrl);
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;
@@ -126,11 +142,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isDownloading = false);
 
-    if (file == null && !kIsWeb) {
+    if (file == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           backgroundColor: AppColors.coral,
-          content: Text('Failed to download update. Please check internet connection or use browser link.'),
+          content: const Text('Failed to download update. Please check internet connection or open in browser.'),
+          action: SnackBarAction(
+            label: 'Browser',
+            textColor: Colors.white,
+            onPressed: () => AppUpdateService.openUrl(update.apkDownloadUrl),
+          ),
         ),
       );
     }
@@ -212,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: AppColors.teal.withOpacity(0.12),
+                                color: AppColors.teal.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(Icons.system_update_rounded, color: AppColors.teal, size: 22),
@@ -226,9 +247,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     'App Updates',
                                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
                                   ),
-                                  Text(
-                                    'Current Version: ${AppUpdateService.currentVersion}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'Version: ${AppUpdateService.currentVersion}',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                                      ),
+                                      if (_lastCheckedAt != null) ...[
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '• Checked ${DateFormat('hh:mm a').format(_lastCheckedAt!)}',
+                                          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
@@ -237,76 +269,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: 14),
 
+                        // Status Banner
                         if (_updateStatusMessage.isNotEmpty) ...[
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: _availableUpdate != null
+                              color: _updateStatus == AppUpdateStatus.updateAvailable
                                   ? AppColors.sun.withValues(alpha: 0.2)
-                                  : AppColors.teal.withValues(alpha: 0.1),
+                                  : (_updateStatus == AppUpdateStatus.error
+                                      ? AppColors.coral.withValues(alpha: 0.15)
+                                      : AppColors.teal.withValues(alpha: 0.1)),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _availableUpdate != null
+                                color: _updateStatus == AppUpdateStatus.updateAvailable
                                     ? AppColors.sun
-                                    : AppColors.teal.withValues(alpha: 0.3),
+                                    : (_updateStatus == AppUpdateStatus.error
+                                        ? AppColors.coral.withValues(alpha: 0.4)
+                                        : AppColors.teal.withValues(alpha: 0.3)),
                               ),
                             ),
-                            child: Text(
-                              _updateStatusMessage,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: _availableUpdate != null ? AppColors.ink : AppColors.teal,
-                              ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _updateStatus == AppUpdateStatus.updateAvailable
+                                      ? Icons.new_releases_rounded
+                                      : (_updateStatus == AppUpdateStatus.error
+                                          ? Icons.error_outline_rounded
+                                          : Icons.check_circle_outline_rounded),
+                                  size: 20,
+                                  color: _updateStatus == AppUpdateStatus.updateAvailable
+                                      ? AppColors.ink
+                                      : (_updateStatus == AppUpdateStatus.error ? AppColors.coral : AppColors.teal),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    _updateStatusMessage,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _updateStatus == AppUpdateStatus.updateAvailable
+                                          ? AppColors.ink
+                                          : (_updateStatus == AppUpdateStatus.error ? AppColors.coral : AppColors.teal),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 12),
                         ],
 
-                        if (_availableUpdate != null && !_isDownloading) ...[
+                        // Release Notes Box (shown if release info exists)
+                        if (_latestRelease != null && !_isDownloading) ...[
                           Container(
+                            width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: AppColors.cream.withValues(alpha: 0.5),
+                              color: AppColors.cream.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.cream),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  "What's New in ${_availableUpdate!.version}:",
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      "What's New in ${_latestRelease!.version}:",
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
+                                    ),
+                                    Text(
+                                      _latestRelease!.formattedSize,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 6),
                                 Text(
-                                  _availableUpdate!.notes,
-                                  style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
-                                  maxLines: 4,
+                                  _latestRelease!.notes,
+                                  style: const TextStyle(fontSize: 12, color: AppColors.ink, height: 1.4),
+                                  maxLines: 6,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 46,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.teal,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: const Icon(Icons.download_for_offline_outlined, size: 20),
-                              label: Text(
-                                'Download & Install ${_availableUpdate!.version}',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () => _startInAppDownload(_availableUpdate!),
-                            ),
-                          ),
                         ],
 
+                        // Downloading Progress Bar
                         if (_isDownloading) ...[
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,43 +389,106 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 12),
                         ],
 
+                        // Action Buttons
                         if (!_isDownloading) ...[
+                          // Primary Install Button if update is available
+                          if (_updateStatus == AppUpdateStatus.updateAvailable && _latestRelease != null) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 46,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.teal,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.download_for_offline_outlined, size: 20),
+                                label: Text(
+                                  'Download & Install ${_latestRelease!.version} (${_latestRelease!.formattedSize})',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () => _startInAppDownload(_latestRelease!),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+
+                          // Secondary Re-download / Install APK button if up-to-date or fallback
+                          if ((_updateStatus == AppUpdateStatus.upToDate || _updateStatus == AppUpdateStatus.error) && _latestRelease != null) ...[
+                            SizedBox(
+                              width: double.infinity,
+                              height: 42,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.teal,
+                                  side: const BorderSide(color: AppColors.teal, width: 1.2),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.file_download_outlined, size: 18),
+                                label: Text(
+                                  'Download Sunward.apk (${_latestRelease!.formattedSize})',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                                onPressed: () => _startInAppDownload(_latestRelease!),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+
+                          // Check For Updates Button
                           SizedBox(
                             width: double.infinity,
                             height: 46,
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.ink,
-                                side: const BorderSide(color: AppColors.ink, width: 1.5),
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.ink,
+                                foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                               ),
                               icon: _isCheckingUpdate
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.ink),
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                     )
                                   : const Icon(Icons.refresh_rounded, size: 20),
                               label: Text(
-                                _isCheckingUpdate ? 'Checking...' : 'Check For App Updates',
+                                _isCheckingUpdate ? 'Checking GitHub...' : 'Check For App Updates',
                                 style: const TextStyle(fontWeight: FontWeight.bold),
                               ),
                               onPressed: _isCheckingUpdate ? null : _checkForUpdates,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Center(
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(foregroundColor: AppColors.muted),
-                              icon: const Icon(Icons.open_in_browser_rounded, size: 16),
-                              label: const Text(
-                                'Open GitHub Releases (Browser)',
-                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+
+                          // Direct Web Links
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                icon: const Icon(Icons.open_in_browser_rounded, size: 16),
+                                label: const Text(
+                                  'Releases Page',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: () => AppUpdateService.openUrl(
+                                  _latestRelease?.releasePageUrl ?? AppUpdateService.defaultReleasePageUrl,
+                                ),
                               ),
-                              onPressed: () => AppUpdateService.openUrl(
-                                _availableUpdate?.releasePageUrl ?? AppUpdateService.defaultReleasePageUrl,
+                              const Text('•', style: TextStyle(color: AppColors.muted)),
+                              TextButton.icon(
+                                style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: const EdgeInsets.symmetric(horizontal: 8)),
+                                icon: const Icon(Icons.download_rounded, size: 16),
+                                label: const Text(
+                                  'Direct APK Link',
+                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                ),
+                                onPressed: () => AppUpdateService.openUrl(
+                                  _latestRelease?.apkDownloadUrl ?? AppUpdateService.defaultDirectApkUrl,
+                                ),
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ],

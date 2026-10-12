@@ -164,7 +164,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
       bottomNavigationBar: ValueListenableBuilder<List<Lead>>(
         valueListenable: LeadService.instance.leadsNotifier,
         builder: (context, leads, _) {
-          final newLeadsCount = leads.where((l) => l.status == LeadStatus.newLead).length;
+          final newLeadsCount = leads.where((l) => l.status == LeadStatus.newLead && !l.isNotInterested).length;
 
           return BottomNavigationBar(
             currentIndex: _currentIndex,

@@ -32,17 +32,11 @@ class _LeadsScreenState extends State<LeadsScreen> {
       case LeadStatus.newLead:
         return AppColors.coral;
       case LeadStatus.contacted:
-        return Colors.blueGrey;
-      case LeadStatus.qualified:
         return Colors.indigo;
-      case LeadStatus.siteVisit:
-        return AppColors.sun;
       case LeadStatus.quotation:
         return Colors.deepPurple;
-      case LeadStatus.won:
+      case LeadStatus.interested:
         return AppColors.teal;
-      case LeadStatus.lost:
-        return Colors.grey;
     }
   }
 
@@ -201,7 +195,15 @@ class _LeadsScreenState extends State<LeadsScreen> {
             valueListenable: LeadService.instance.leadsNotifier,
             builder: (context, leads, _) {
               final filtered = leads.where((l) {
-                final matchesStatus = _selectedFilter == 'All' || l.status.label == _selectedFilter;
+                final bool matchesStatus;
+                if (_selectedFilter == 'All') {
+                  matchesStatus = !l.isNotInterested;
+                } else if (_selectedFilter == 'Not Interested') {
+                  matchesStatus = l.isNotInterested;
+                } else {
+                  matchesStatus = !l.isNotInterested && l.status.label == _selectedFilter;
+                }
+
                 final matchesSearch = _searchQuery.isEmpty ||
                     l.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                     l.phone.contains(_searchQuery) ||
@@ -209,9 +211,10 @@ class _LeadsScreenState extends State<LeadsScreen> {
                 return matchesStatus && matchesSearch;
               }).toList();
 
-              final totalCount = leads.length;
-              final newCount = leads.where((l) => l.status == LeadStatus.newLead).length;
-              final wonCount = leads.where((l) => l.status == LeadStatus.won).length;
+              final totalActiveCount = leads.where((l) => !l.isNotInterested).length;
+              final newCount = leads.where((l) => l.status == LeadStatus.newLead && !l.isNotInterested).length;
+              final interestedCount = leads.where((l) => l.status == LeadStatus.interested && !l.isNotInterested).length;
+              final notInterestedCount = leads.where((l) => l.isNotInterested).length;
 
               return Column(
                 children: [
@@ -222,11 +225,11 @@ class _LeadsScreenState extends State<LeadsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildTopMetric(lang.t('Total Leads', 'कुल लीड्स'), '$totalCount', AppColors.white),
+                        _buildTopMetric('Active Leads', '$totalActiveCount', AppColors.white),
                         Container(width: 1, height: 24, color: Colors.white24),
-                        _buildTopMetric(lang.t('New Pending', 'नई पेंडिंग'), '$newCount', AppColors.sun),
+                        _buildTopMetric('New Pending', '$newCount', AppColors.sun),
                         Container(width: 1, height: 24, color: Colors.white24),
-                        _buildTopMetric(lang.t('Deal Won', 'डील पक्की'), '$wonCount', AppColors.teal),
+                        _buildTopMetric('Interested', '$interestedCount', AppColors.teal),
                       ],
                     ),
                   ),
@@ -263,9 +266,13 @@ class _LeadsScreenState extends State<LeadsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                     child: Row(
                       children: [
-                        _buildFilterChip('All', lang.t('All', 'सभी')),
+                        _buildFilterChip('All', 'All'),
                         for (final status in LeadStatus.values)
                           _buildFilterChip(status.label, status.label),
+                        _buildFilterChip(
+                          'Not Interested',
+                          notInterestedCount > 0 ? 'Not Interested ($notInterestedCount)' : 'Not Interested',
+                        ),
                       ],
                     ),
                   ),
@@ -296,6 +303,8 @@ class _LeadsScreenState extends State<LeadsScreen> {
 
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
+                                color: lead.isNotInterested ? const Color(0xFFF7F8F9) : AppColors.white,
+                                elevation: lead.isNotInterested ? 0.8 : 2.0,
                                 child: Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Column(
@@ -310,10 +319,12 @@ class _LeadsScreenState extends State<LeadsScreen> {
                                               children: [
                                                 Text(
                                                   lead.name,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
-                                                    color: AppColors.ink,
+                                                    color: lead.isNotInterested ? Colors.blueGrey.shade700 : AppColors.ink,
+                                                    decoration: lead.isNotInterested ? TextDecoration.lineThrough : null,
+                                                    decorationColor: Colors.blueGrey.shade400,
                                                   ),
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
@@ -331,67 +342,158 @@ class _LeadsScreenState extends State<LeadsScreen> {
                                           const SizedBox(width: 8),
 
                                           // Status Selector Chip
-                                          PopupMenuButton<LeadStatus>(
+                                          PopupMenuButton<String>(
                                             tooltip: 'Update status',
-                                            initialValue: lead.status,
-                                            onSelected: (newStatus) {
-                                              LeadService.instance.updateStatus(lead.id, newStatus);
-                                            },
-                                            itemBuilder: (context) => LeadStatus.values.map((s) {
-                                              final isCurrent = s == lead.status;
-                                              final color = _getStatusColor(s);
-                                              return PopupMenuItem(
-                                                value: s,
-                                                child: Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 8,
-                                                      height: 8,
-                                                      decoration: BoxDecoration(
-                                                        color: color,
-                                                        shape: BoxShape.circle,
-                                                      ),
+                                            onSelected: (action) {
+                                              if (action == 'not_interested') {
+                                                LeadService.instance.markNotInterested(lead.id, notInterested: true);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Marked "${lead.name}" as Not Interested'),
+                                                    duration: const Duration(seconds: 3),
+                                                    action: SnackBarAction(
+                                                      label: 'Undo',
+                                                      onPressed: () {
+                                                        LeadService.instance.markNotInterested(lead.id, notInterested: false);
+                                                      },
                                                     ),
-                                                    const SizedBox(width: 10),
-                                                    Expanded(
-                                                      child: Text(
-                                                        s.label,
-                                                        style: TextStyle(
-                                                          fontSize: 13.5,
-                                                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                                          color: AppColors.ink,
+                                                  ),
+                                                );
+                                              } else if (action == 'restore') {
+                                                LeadService.instance.markNotInterested(lead.id, notInterested: false);
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Restored "${lead.name}" to active pipeline (${lead.status.label})'),
+                                                    duration: const Duration(seconds: 2),
+                                                  ),
+                                                );
+                                              } else {
+                                                final newStatus = LeadStatus.fromString(action);
+                                                LeadService.instance.updateStatus(lead.id, newStatus);
+                                              }
+                                            },
+                                            itemBuilder: (context) => [
+                                              // 4 Core Pipeline Stages
+                                              ...LeadStatus.values.map((s) {
+                                                final isCurrent = !lead.isNotInterested && s == lead.status;
+                                                final color = _getStatusColor(s);
+                                                return PopupMenuItem<String>(
+                                                  value: s.label,
+                                                  child: Row(
+                                                    children: [
+                                                      Container(
+                                                        width: 9,
+                                                        height: 9,
+                                                        decoration: BoxDecoration(
+                                                          color: color,
+                                                          shape: BoxShape.circle,
                                                         ),
                                                       ),
-                                                    ),
-                                                    if (isCurrent)
-                                                      const Icon(Icons.check_rounded, size: 16, color: AppColors.teal),
-                                                  ],
+                                                      const SizedBox(width: 10),
+                                                      Expanded(
+                                                        child: Text(
+                                                          s.label,
+                                                          style: TextStyle(
+                                                            fontSize: 13.5,
+                                                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                                            color: AppColors.ink,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      if (isCurrent)
+                                                        const Icon(Icons.check_rounded, size: 16, color: AppColors.teal),
+                                                    ],
+                                                  ),
+                                                );
+                                              }),
+
+                                              const PopupMenuDivider(),
+
+                                              // Dedicated Outcome: Not Interested
+                                              if (lead.isNotInterested)
+                                                PopupMenuItem<String>(
+                                                  value: 'restore',
+                                                  child: const Row(
+                                                    children: [
+                                                      Icon(Icons.replay_rounded, size: 18, color: AppColors.teal),
+                                                      SizedBox(width: 10),
+                                                      Expanded(
+                                                        child: Text(
+                                                          'Restore to Active Pipeline',
+                                                          style: TextStyle(
+                                                            fontSize: 13.5,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: AppColors.ink,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              else
+                                                PopupMenuItem<String>(
+                                                  value: 'not_interested',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(Icons.cancel_outlined, size: 18, color: Colors.blueGrey.shade600),
+                                                      const SizedBox(width: 10),
+                                                      const Expanded(
+                                                        child: Text(
+                                                          'Mark as Not Interested',
+                                                          style: TextStyle(
+                                                            fontSize: 13.5,
+                                                            fontWeight: FontWeight.w600,
+                                                            color: Colors.blueGrey,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
-                                              );
-                                            }).toList(),
+                                            ],
                                             child: Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                               decoration: BoxDecoration(
-                                                color: badgeColor.withOpacity(0.18),
-                                                border: Border.all(color: badgeColor, width: 1.2),
+                                                color: lead.isNotInterested
+                                                    ? Colors.blueGrey.withOpacity(0.12)
+                                                    : badgeColor.withOpacity(0.18),
+                                                border: Border.all(
+                                                  color: lead.isNotInterested ? Colors.blueGrey.shade300 : badgeColor,
+                                                  width: 1.2,
+                                                ),
                                                 borderRadius: BorderRadius.circular(16),
                                               ),
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Text(
-                                                    lead.status.label,
-                                                    style: TextStyle(
-                                                      color: badgeColor == AppColors.sun ? AppColors.ink : badgeColor,
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 11,
+                                                  if (lead.isNotInterested) ...[
+                                                    Icon(Icons.remove_circle_outline, size: 12, color: Colors.blueGrey.shade700),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Not Interested',
+                                                      style: TextStyle(
+                                                        color: Colors.blueGrey.shade700,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
                                                     ),
-                                                  ),
+                                                  ] else ...[
+                                                    Text(
+                                                      lead.status.label,
+                                                      style: TextStyle(
+                                                        color: badgeColor == AppColors.sun ? AppColors.ink : badgeColor,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontSize: 11,
+                                                      ),
+                                                    ),
+                                                  ],
                                                   const SizedBox(width: 4),
                                                   Icon(
                                                     Icons.arrow_drop_down,
                                                     size: 16,
-                                                    color: badgeColor == AppColors.sun ? AppColors.ink : badgeColor,
+                                                    color: lead.isNotInterested
+                                                        ? Colors.blueGrey.shade700
+                                                        : (badgeColor == AppColors.sun ? AppColors.ink : badgeColor),
                                                   ),
                                                 ],
                                               ),
