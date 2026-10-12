@@ -2,6 +2,8 @@ package com.sunward.solar
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -84,6 +86,29 @@ class MainActivity: FlutterActivity() {
                         result.error("SEND_ERROR", e.localizedMessage, null)
                     }
                 }
+                "canRequestPackageInstalls" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        result.success(packageManager.canRequestPackageInstalls())
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "openInstallPermissionSettings" -> {
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = Uri.parse("package:${applicationContext.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } else {
+                            result.success(true)
+                        }
+                    } catch (e: Exception) {
+                        result.error("SETTINGS_ERROR", e.localizedMessage, null)
+                    }
+                }
                 "installApk" -> {
                     val filePath = call.argument<String>("filePath")
                     if (filePath == null) {
@@ -98,6 +123,16 @@ class MainActivity: FlutterActivity() {
                             return@setMethodCallHandler
                         }
 
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+                            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                                data = Uri.parse("package:${applicationContext.packageName}")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(settingsIntent)
+                            result.error("PERMISSION_REQUIRED", "Unknown sources permission required. Please allow and retry install.", null)
+                            return@setMethodCallHandler
+                        }
+
                         val contentUri = FileProvider.getUriForFile(
                             this,
                             "${applicationContext.packageName}.fileprovider",
@@ -108,6 +143,10 @@ class MainActivity: FlutterActivity() {
                             setDataAndType(contentUri, "application/vnd.android.package-archive")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                            putExtra(Intent.EXTRA_INSTALLER_PACKAGE_NAME, applicationContext.packageName)
+                            putExtra(Intent.EXTRA_RETURN_RESULT, true)
                         }
 
                         startActivity(intent)

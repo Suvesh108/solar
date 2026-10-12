@@ -11,6 +11,10 @@ android {
             keyPassword = "sunward123456"
             storeFile = file("sunward-release.jks")
             storePassword = "sunward123456"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
         }
     }
 

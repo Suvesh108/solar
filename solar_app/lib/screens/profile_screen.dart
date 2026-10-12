@@ -142,7 +142,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     setState(() => _isDownloading = false);
 
-    if (file == null) {
+    if (file != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.teal,
+          content: Text('Update downloaded! Launching installer... If prompted for security scan, select "Don\'t scan" or "Install anyway".'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.coral,
@@ -201,9 +209,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              Text(
-                                lang.t('Sunward Solar Partner / User', 'सनवर्ड सोलर पार्टनर / यूजर'),
-                                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                              const Text(
+                                'Sunward Solar Partner / User',
+                                style: TextStyle(fontSize: 12, color: AppColors.muted),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -212,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, color: AppColors.ink),
-                          tooltip: lang.t('Edit Name', 'नाम बदलें'),
+                          tooltip: 'Edit Name',
                           onPressed: _editName,
                         ),
                       ],
@@ -490,6 +498,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.sun.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.security_outlined, size: 16, color: AppColors.ink),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Installation Tip: If your phone prompts with a security scan or Play Protect check, select "Don\'t scan" or "Install anyway" to proceed.',
+                                    style: TextStyle(fontSize: 11, color: AppColors.ink, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -504,9 +533,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          lang.t('Help & Support', 'मदद और सहायता'),
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
+                        const Text(
+                          'Help & Support',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.ink),
                         ),
                         const SizedBox(height: 10),
                         ListTile(
@@ -515,7 +544,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             backgroundColor: AppColors.cream,
                             child: Icon(Icons.phone, color: AppColors.ink, size: 20),
                           ),
-                          title: Text(lang.t('Call Helpline', 'हेल्पलाइन कॉल करें'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          title: const Text('Call Helpline', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                           subtitle: const Text('+91 9731001477', style: TextStyle(fontSize: 12)),
                           onTap: () => launchUrl(Uri.parse('tel:9731001477')),
                         ),
@@ -526,8 +555,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             backgroundColor: Color(0xFFDCF8C6),
                             child: Icon(Icons.chat, color: Color(0xFF075E54), size: 20),
                           ),
-                          title: Text(lang.t('WhatsApp Advisor', 'व्हाट्सऐप पर संपर्क करें'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                          subtitle: Text(lang.t('Chat with Solar Advisor', 'सोलर सलाहकार से चैट करें'), style: const TextStyle(fontSize: 12)),
+                          title: const Text('WhatsApp Advisor', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          subtitle: const Text('Chat with Solar Advisor', style: TextStyle(fontSize: 12)),
                           onTap: () => launchUrl(
                             Uri.parse('https://wa.me/919731001477?text=${Uri.encodeComponent("Namaste Sunward Team, need solar help.")}'),
                             mode: LaunchMode.externalApplication,

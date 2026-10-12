@@ -1,7 +1,7 @@
-### Sunward Solar v0.1.1 Updates
+### Sunward Solar v0.1.2 Updates
 
-- **Streamlined 4-Stage Lead Pipeline**: Simplified lead progression stages into 4 focused categories: `New`, `Contacted`, `Quotation`, and `Interested`.
-- **Dedicated 'Not Interested' Outcome**: Disqualified leads are placed into a separate disposition below a divider with 1-tap restore and undo, keeping active sales funnels clean.
-- **Dedicated Filter Tabs**: Lead cards default to active leads, with a separate filter chip to review dropped/disqualified prospects anytime.
-- **Rebuilt In-App Updater**: Fixed web browser compatibility with web-safe request headers, multi-tiered fallbacks (raw manifest + GitHub API), persistent release notes, and direct APK download buttons.
-- **Turnkey Pricing & Pure English Interface**: Residential @ ₹70,000/kW, Commercial @ ₹50,000/kW, and high-readability typography throughout.
+- **Smooth In-App APK Installation**: Upgraded native package installation pipeline with modern Android PackageInstaller flags (`EXTRA_NOT_UNKNOWN_SOURCE = true`, `EXTRA_INSTALLER_PACKAGE_NAME`).
+- **One-Tap Permission Flow**: Added native Unknown Apps permission verification (`canRequestPackageInstalls`) with automatic redirection to system settings.
+- **Enhanced APK Signing**: Enforced full V1 (JAR), V2 (APK signature scheme), V3, and V4 multi-scheme signing with standard PKCS12 release keystore for maximum Android OS security trust.
+- **Removed High-Risk Permissions**: Stripped obsolete direct phone call and storage permissions, removing Play Protect and OEM security scanner flags.
+- **Streamlined 4-Stage Lead Pipeline & Pure English UI**: High-speed lead tracker with 4 active stages (`New`, `Contacted`, `Quotation`, `Interested`) and dedicated "Not Interested" outcome disposition.

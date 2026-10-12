@@ -58,7 +58,7 @@ class AppUpdateResult {
 }
 
 class AppUpdateService {
-  static const String currentVersion = 'v0.1.1';
+  static const String currentVersion = 'v0.1.2';
   static const String githubOwner = 'Suvesh108';
   static const String githubRepo = 'solar';
 
@@ -401,12 +401,22 @@ class AppUpdateService {
       bool nativeInstalled = false;
       try {
         const platform = MethodChannel('com.sunward.solar/whatsapp');
+        if (!kIsWeb && Platform.isAndroid) {
+          final canInstall = await platform.invokeMethod<bool>('canRequestPackageInstalls');
+          if (canInstall == false) {
+            await platform.invokeMethod('openInstallPermissionSettings');
+            return apkFile;
+          }
+        }
+
         final res = await platform.invokeMethod<bool>(
           'installApk',
           {'filePath': apkFile.path},
         );
         if (res == true) nativeInstalled = true;
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('[AppUpdateService] Native install error: $e');
+      }
 
       if (!nativeInstalled) {
         await OpenFilex.open(
@@ -425,6 +435,27 @@ class AppUpdateService {
     } finally {
       client?.close();
     }
+  }
+
+  /// Check if the app is authorized to install APK updates directly
+  static Future<bool> canInstallPackages() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      const platform = MethodChannel('com.sunward.solar/whatsapp');
+      final can = await platform.invokeMethod<bool>('canRequestPackageInstalls');
+      return can ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Open Android settings to allow installs from this source
+  static Future<void> openInstallPermissionSettings() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      const platform = MethodChannel('com.sunward.solar/whatsapp');
+      await platform.invokeMethod('openInstallPermissionSettings');
+    } catch (_) {}
   }
 
   /// Open external URL safely

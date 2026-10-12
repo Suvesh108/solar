@@ -81,7 +81,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME="v0.1.1"
+          TAG_NAME="v0.1.2"
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK="Sunward.apk"
           cp "$APK_PATH" "$OUT_APK"
