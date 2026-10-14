@@ -1,6 +1,5 @@
-### Sunward Solar v0.1.4 Updates
+### Sunward Solar v0.1.5 Updates
 
-- **Native Kotlin Update Engine**: Built a pure Kotlin update engine (`AppUpdater.kt`) handling GitHub release querying, dynamic installed package version inspection, background downloading with HTTP redirect handling, live stream progress reporting, and native system package installer triggering.
-- **Interactive Update Popup Modal**: Integrated popup dialog displaying release notes and live progress tracking with direct "Update Now" and "Later" options.
-- **Android 11+ & 14+ Compatibility**: Added explicit package archive intent filters to `<queries>` and FileProvider URI grant permissions for all resolving package installer activities.
-- **Automated CI/CD Workflow**: Replaced hardcoded version release with dynamic tag-triggered GitHub release automation.
+- **Fixed Missing Internet Permission Bug**: Resolved root cause in CI build generator (`setup_android.py`) ensuring `android.permission.INTERNET`, `ACCESS_NETWORK_STATE`, and `REQUEST_INSTALL_PACKAGES` are always properly injected into `AndroidManifest.xml` during automated build steps.
+- **Native Kotlin Update Engine**: Pure Kotlin update engine (`AppUpdater.kt`) querying GitHub releases, dynamically checking installed package versions, background downloading with stream progress, and native package installer launching.
+- **Polished Profile UI & Error Handling**: Replaced raw platform exception dumps with human-friendly network error notifications and clean version tracking.

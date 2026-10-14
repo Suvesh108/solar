@@ -2,9 +2,10 @@
     package="com.sunward.solar">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-            <queries>
+    <queries>
         <intent>
             <action android:name="android.intent.action.DIAL" />
             <data android:scheme="tel" />
@@ -33,7 +34,6 @@
         <package android:name="com.whatsapp.w4b" />
     </queries>
 
-
     <application
         android:usesCleartextTraffic="true"
         android:label="Sunward"
@@ -59,7 +59,7 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-            <provider
+        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
             android:exported="false"

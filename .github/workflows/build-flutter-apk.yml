@@ -61,7 +61,7 @@ jobs:
         run: |
           TAG_VER="${{ github.ref_name }}"
           if [ -z "$TAG_VER" ] || [ "$TAG_VER" = "main" ]; then
-            TAG_VER="v0.1.4"
+            TAG_VER="v0.1.5"
           fi
           CLEAN_VER="${TAG_VER#v}"
           BUILD_NUM="${{ github.run_number }}"
@@ -78,7 +78,7 @@ jobs:
         run: |
           TAG_VER="${{ github.ref_name }}"
           if [ -z "$TAG_VER" ] || [ "$TAG_VER" = "main" ]; then
-            TAG_VER="v0.1.4"
+            TAG_VER="v0.1.5"
           fi
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
           OUT_APK="Sunward.apk"

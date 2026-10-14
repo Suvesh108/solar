@@ -108,14 +108,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      final errorStr = e.toString();
+      final String userMsg;
+      if (errorStr.contains('INTERNET') || errorStr.contains('SocketException') || errorStr.contains('Failed host lookup')) {
+        userMsg = 'Network error. Please check your internet connection.';
+      } else {
+        userMsg = errorStr.replaceAll('PlatformException(', '').replaceAll(', null, null)', '').trim();
+      }
       setState(() {
         _isCheckingUpdate = false;
-        _updateStatusMessage = 'Could not check updates: $e';
+        _updateStatusMessage = userMsg;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppColors.coral,
-          content: Text('Could not check updates: $e'),
+          content: Text(userMsg),
           duration: const Duration(seconds: 4),
         ),
       );
@@ -340,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        'Version: ${_updateInfo?.currentVersion ?? "0.1.4"}',
+                                        'Version: ${_updateInfo?.currentVersion ?? "0.1.5"}',
                                         style: const TextStyle(fontSize: 12, color: AppColors.muted),
                                       ),
                                       if (_lastCheckedAt != null) ...[

@@ -55,8 +55,8 @@ class AppUpdateService {
     if (kIsWeb) {
       return const AppUpdateInfo(
         hasUpdate: false,
-        currentVersion: '0.1.4',
-        latestVersion: '0.1.4',
+        currentVersion: '0.1.5',
+        latestVersion: '0.1.5',
         downloadUrl: '',
         size: 0,
         notes: '',
@@ -69,7 +69,7 @@ class AppUpdateService {
 
       return AppUpdateInfo(
         hasUpdate: res['hasUpdate'] as bool? ?? false,
-        currentVersion: res['currentVersion'] as String? ?? '0.1.4',
+        currentVersion: res['currentVersion'] as String? ?? '0.1.5',
         latestVersion: res['latestVersion'] as String? ?? '',
         downloadUrl: res['downloadUrl'] as String? ?? '',
         size: (res['size'] as num?)?.toInt() ?? 0,
@@ -78,8 +78,8 @@ class AppUpdateService {
     } on MissingPluginException {
       return const AppUpdateInfo(
         hasUpdate: false,
-        currentVersion: '0.1.4',
-        latestVersion: '0.1.4',
+        currentVersion: '0.1.5',
+        latestVersion: '0.1.5',
         downloadUrl: '',
         size: 0,
         notes: '',

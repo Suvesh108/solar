@@ -55,7 +55,7 @@ class MainActivity: FlutterActivity() {
             }
         }
 
-        // 2. WhatsApp & Legacy Channel
+        // 2. WhatsApp Image Channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WHATSAPP_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "sendWhatsAppImage" -> {
@@ -127,48 +127,15 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "installApk" -> {
-                    handleInstallApk(call.argument<String>("filePath"), result)
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        appUpdater?.installApk(File(filePath), result)
+                    } else {
+                        result.error("INVALID_PATH", "Path is null", null)
+                    }
                 }
                 else -> result.notImplemented()
             }
-        }
-    }
-
-    private fun handleInstallApk(filePath: String?, result: MethodChannel.Result) {
-        if (filePath != null) {
-            try {
-                val file = File(filePath)
-                if (!file.exists()) {
-                    result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
-                    return
-                }
-                val context = applicationContext
-                val uri: Uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                val intent = Intent(Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                }
-                val resInfoList = context.packageManager.queryIntentActivities(
-                    intent,
-                    PackageManager.MATCH_DEFAULT_ONLY
-                )
-                for (resolveInfo in resInfoList) {
-                    val packageName = resolveInfo.activityInfo.packageName
-                    context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(intent)
-                result.success(true)
-            } catch (e: Exception) {
-                result.error("INSTALL_ERROR", e.localizedMessage, null)
-            }
-        } else {
-            result.error("INVALID_PATH", "Path is null", null)
         }
     }
 }

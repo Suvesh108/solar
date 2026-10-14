@@ -40,50 +40,55 @@ def setup_android():
         with open(manifest_path, "r", encoding="utf-8") as f:
             content = f.read()
 
-        permissions = """
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.DIAL"/>
-            <data android:scheme="tel"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW"/>
-            <data android:scheme="https"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW"/>
-            <data android:scheme="whatsapp"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW"/>
-            <data android:mimeType="application/vnd.android.package-archive"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.INSTALL_PACKAGE"/>
-            <data android:mimeType="application/vnd.android.package-archive"/>
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.SEND"/>
-            <data android:mimeType="*/*"/>
-        </intent>
-        <package android:name="com.whatsapp" />
-        <package android:name="com.whatsapp.w4b" />
-    </queries>
-"""
         # Clean any dangerous/obsolete permissions
         content = re.sub(r'<uses-permission\s+android:name="android\.permission\.CALL_PHONE"[^>]*/>\s*', '', content)
         content = re.sub(r'<uses-permission\s+android:name="android\.permission\.READ_EXTERNAL_STORAGE"[^>]*/>\s*', '', content)
         content = re.sub(r'<uses-permission\s+android:name="android\.permission\.READ_MEDIA_[^"]*"[^>]*/>\s*', '', content)
 
-        content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward"', content)
-        if 'android:usesCleartextTraffic' not in content:
-            content = content.replace('<application', '<application\n        android:usesCleartextTraffic="true"')
+        # Ensure essential permissions are ALWAYS present
+        required_permissions = [
+            '<uses-permission android:name="android.permission.INTERNET" />',
+            '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+            '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />',
+        ]
+        for perm in required_permissions:
+            perm_match = re.search(r'android:name="([^"]+)"', perm)
+            if perm_match and perm_match.group(1) not in content:
+                content = content.replace("<application", f"    {perm}\n    <application")
 
-        if "<queries>" not in content:
-            content = content.replace("<application", permissions + "\n    <application")
+        queries_block = """    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.INSTALL_PACKAGE" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>"""
+
+        if "<queries>" in content:
+            content = re.sub(r'<queries>.*?</queries>', queries_block.strip(), content, flags=re.DOTALL)
+        else:
+            content = content.replace("<application", queries_block + "\n    <application")
 
         provider_block = """        <provider
             android:name="androidx.core.content.FileProvider"
@@ -154,7 +159,7 @@ class AppUpdater(private val activity: Activity, private val channel: MethodChan
                     @Suppress("DEPRECATION")
                     activity.packageManager.getPackageInfo(activity.packageName, 0)
                 }}
-                val currentVersion = packageInfo.versionName ?: "0.1.4"
+                val currentVersion = packageInfo.versionName ?: "0.1.5"
 
                 val url = URL("https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest")
                 val conn = (url.openConnection() as HttpURLConnection).apply {{

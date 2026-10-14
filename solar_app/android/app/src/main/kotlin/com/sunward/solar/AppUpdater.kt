@@ -35,7 +35,7 @@ class AppUpdater(private val activity: Activity, private val channel: MethodChan
                     @Suppress("DEPRECATION")
                     activity.packageManager.getPackageInfo(activity.packageName, 0)
                 }
-                val currentVersion = packageInfo.versionName ?: "0.1.4"
+                val currentVersion = packageInfo.versionName ?: "0.1.5"
 
                 val url = URL("https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest")
                 val conn = (url.openConnection() as HttpURLConnection).apply {
