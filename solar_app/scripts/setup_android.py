@@ -610,5 +610,34 @@ class MainActivity: FlutterActivity() {{
             f.write(gradle_text)
         print("Configured release signing and build types in build.gradle.")
 
+    # 6. Configure network timeouts and retries in gradle.properties
+    gradle_props_file = os.path.join(base_dir, "android", "gradle.properties")
+    props_to_ensure = [
+        "org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G -XX:+HeapDumpOnOutOfMemoryError",
+        "android.useAndroidX=true",
+        "android.enableJetifier=true",
+        "org.gradle.internal.http.socketTimeout=120000",
+        "org.gradle.internal.http.connectionTimeout=120000",
+        "org.gradle.internal.repository.max.retries=10",
+        "org.gradle.internal.repository.max.tentatives=10",
+        "systemProp.org.gradle.internal.http.socketTimeout=120000",
+        "systemProp.org.gradle.internal.http.connectionTimeout=120000",
+    ]
+    current_props = ""
+    if os.path.exists(gradle_props_file):
+        with open(gradle_props_file, "r", encoding="utf-8") as f:
+            current_props = f.read()
+
+    new_lines = []
+    for prop in props_to_ensure:
+        key = prop.split("=")[0]
+        if key not in current_props:
+            new_lines.append(prop)
+
+    if new_lines:
+        with open(gradle_props_file, "a", encoding="utf-8") as f:
+            f.write("\n" + "\n".join(new_lines) + "\n")
+        print("Configured Gradle network timeouts and retries in gradle.properties.")
+
 if __name__ == "__main__":
     setup_android()

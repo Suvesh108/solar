@@ -66,8 +66,29 @@ jobs:
           CLEAN_VER="${TAG_VER#v}"
           BUILD_NUM="${{ github.run_number }}"
           echo "Building release APK for version: ${CLEAN_VER} with build number: ${BUILD_NUM}"
-          if ! flutter build apk --release --no-tree-shake-icons --build-name="${CLEAN_VER}" --build-number="${BUILD_NUM}" -v > build_log.txt 2>&1; then
-            echo "=== FLUTTER BUILD RELEASE FAILED ==="
+
+          MAX_RETRIES=3
+          RETRY=1
+          BUILD_SUCCESS=0
+          while [ $RETRY -le $MAX_RETRIES ]; do
+            echo "=== BUILD ATTEMPT $RETRY of $MAX_RETRIES ==="
+            if flutter build apk --release --no-tree-shake-icons --build-name="${CLEAN_VER}" --build-number="${BUILD_NUM}" -v > build_log.txt 2>&1; then
+              BUILD_SUCCESS=1
+              echo "=== BUILD SUCCEEDED ON ATTEMPT $RETRY ==="
+              break
+            else
+              echo "=== BUILD ATTEMPT $RETRY FAILED ==="
+              tail -n 80 build_log.txt
+              if [ $RETRY -lt $MAX_RETRIES ]; then
+                echo "Waiting 15 seconds before retrying build..."
+                sleep 15
+              fi
+              RETRY=$((RETRY + 1))
+            fi
+          done
+
+          if [ $BUILD_SUCCESS -ne 1 ]; then
+            echo "=== ALL $MAX_RETRIES BUILD ATTEMPTS FAILED ==="
             tail -n 150 build_log.txt
             exit 1
           fi
