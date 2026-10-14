@@ -347,7 +347,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        'Version: ${_updateInfo?.currentVersion ?? "0.1.5"}',
+                                        'Version: ${_updateInfo?.currentVersion ?? "0.1.6"}',
                                         style: const TextStyle(fontSize: 12, color: AppColors.muted),
                                       ),
                                       if (_lastCheckedAt != null) ...[

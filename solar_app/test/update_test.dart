@@ -35,11 +35,11 @@ void main() {
       if (methodCall.method == 'checkForUpdate') {
         return {
           'hasUpdate': true,
-          'currentVersion': '0.1.3',
-          'latestVersion': '0.1.4',
-          'downloadUrl': 'https://github.com/SuveshTheCoder/sunward-releases/releases/download/v0.1.4/Sunward.apk',
+          'currentVersion': '0.1.5',
+          'latestVersion': '0.1.6',
+          'downloadUrl': 'https://github.com/Suvesh108/solar/releases/download/v0.1.6/Sunward-Solar-v0.1.6.apk',
           'size': 54245959,
-          'notes': 'Bug fixes and performance improvements',
+          'notes': 'Bug fixes, new logo, and performance improvements',
         };
       }
       return null;
@@ -47,9 +47,9 @@ void main() {
 
     final updateInfo = await AppUpdateService.checkForUpdate();
     expect(updateInfo.hasUpdate, isTrue);
-    expect(updateInfo.currentVersion, equals('0.1.3'));
-    expect(updateInfo.latestVersion, equals('0.1.4'));
-    expect(updateInfo.downloadUrl, contains('Sunward.apk'));
+    expect(updateInfo.currentVersion, equals('0.1.5'));
+    expect(updateInfo.latestVersion, equals('0.1.6'));
+    expect(updateInfo.downloadUrl, contains('Sunward-Solar-v0.1.6.apk'));
     expect(updateInfo.formattedSize, equals('51.7 MB'));
     expect(updateInfo.notes, contains('Bug fixes'));
   });

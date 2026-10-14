@@ -90,6 +90,10 @@ def setup_android():
         else:
             content = content.replace("<application", queries_block + "\n    <application")
 
+        content = re.sub(r'android:label="[^"]*"', 'android:label="Sunward Solar"', content)
+        if 'android:usesCleartextTraffic' not in content:
+            content = content.replace('<application', '<application\n        android:usesCleartextTraffic="true"')
+
         provider_block = """        <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -159,7 +163,7 @@ class AppUpdater(private val activity: Activity, private val channel: MethodChan
                     @Suppress("DEPRECATION")
                     activity.packageManager.getPackageInfo(activity.packageName, 0)
                 }}
-                val currentVersion = packageInfo.versionName ?: "0.1.5"
+                val currentVersion = packageInfo.versionName ?: "0.1.6"
 
                 val url = URL("https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest")
                 val conn = (url.openConnection() as HttpURLConnection).apply {{
@@ -199,7 +203,7 @@ class AppUpdater(private val activity: Activity, private val channel: MethodChan
                 }}
 
                 if (downloadUrl.isEmpty() && tagName.isNotEmpty()) {{
-                    downloadUrl = "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$tagName/Sunward.apk"
+                    downloadUrl = "https://github.com/$REPO_OWNER/$REPO_NAME/releases/download/$tagName/Sunward-Solar-$tagName.apk"
                 }}
 
                 val hasUpdate = isVersionNewer(tagName, currentVersion)

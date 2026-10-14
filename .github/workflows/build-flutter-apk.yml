@@ -61,7 +61,7 @@ jobs:
         run: |
           TAG_VER="${{ github.ref_name }}"
           if [ -z "$TAG_VER" ] || [ "$TAG_VER" = "main" ]; then
-            TAG_VER="v0.1.5"
+            TAG_VER="v0.1.6"
           fi
           CLEAN_VER="${TAG_VER#v}"
           BUILD_NUM="${{ github.run_number }}"
@@ -78,16 +78,24 @@ jobs:
         run: |
           TAG_VER="${{ github.ref_name }}"
           if [ -z "$TAG_VER" ] || [ "$TAG_VER" = "main" ]; then
-            TAG_VER="v0.1.5"
+            TAG_VER="v0.1.6"
           fi
           APK_PATH="solar_app/build/app/outputs/flutter-apk/app-release.apk"
-          OUT_APK="Sunward.apk"
+          OUT_APK="Sunward-Solar-${TAG_VER}.apk"
           cp "$APK_PATH" "$OUT_APK"
 
           if gh release view "$TAG_VER" > /dev/null 2>&1; then
-            echo "Updating existing release $TAG_VER with clobber..."
+            echo "Existing release $TAG_VER found. Cleaning any old APK assets to ensure ONLY ONE APK exists..."
+            EXISTING_ASSETS=$(gh release view "$TAG_VER" --json assets -q '.assets[].name' 2>/dev/null || true)
+            for asset in $EXISTING_ASSETS; do
+              if [[ "$asset" == *.apk ]]; then
+                echo "Removing older release asset: $asset"
+                gh release delete-asset "$TAG_VER" "$asset" -y || true
+              fi
+            done
+            echo "Uploading single release asset $OUT_APK..."
             gh release upload "$TAG_VER" "$OUT_APK" --clobber
           else
-            echo "Creating new release $TAG_VER..."
+            echo "Creating new release $TAG_VER with single asset $OUT_APK..."
             gh release create "$TAG_VER" "$OUT_APK" --title "$TAG_VER - Sunward Solar App Update" --notes-file release_notes.md
           fi
