@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
@@ -17,11 +16,8 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _userName = 'Sunward User';
   bool _isCheckingUpdate = false;
-  String _updateStatusMessage = '';
-  AppReleaseInfo? _latestRelease;
-  AppUpdateStatus _updateStatus = AppUpdateStatus.idle;
-  bool _isDownloading = false;
-  double _downloadProgress = 0.0;
+  String? _updateStatusMessage;
+  AppUpdateInfo? _updateInfo;
   DateTime? _lastCheckedAt;
 
   @override
@@ -80,48 +76,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _checkForUpdates() async {
     setState(() {
       _isCheckingUpdate = true;
-      _updateStatus = AppUpdateStatus.checking;
-      _updateStatusMessage = 'Checking GitHub releases for latest version...';
+      _updateStatusMessage = 'Checking for updates...';
     });
 
-    final result = await AppUpdateService.checkForUpdate();
+    try {
+      final info = await AppUpdateService.checkForUpdate();
+      if (!mounted) return;
 
-    if (!mounted) return;
+      setState(() {
+        _updateInfo = info;
+        _lastCheckedAt = DateTime.now();
+        _isCheckingUpdate = false;
+      });
 
-    setState(() {
-      _isCheckingUpdate = false;
-      _updateStatus = result.status;
-      _latestRelease = result.release;
-      _lastCheckedAt = DateTime.now();
-
-      switch (result.status) {
-        case AppUpdateStatus.updateAvailable:
-          _updateStatusMessage = 'New version ${result.release?.version ?? result.latestVersion} is available!';
-          if (result.release != null) {
-            _showUpdateDialog(result.release!);
-          }
-          break;
-        case AppUpdateStatus.upToDate:
-          _updateStatusMessage = 'You are already running the latest version (${result.currentVersion}).';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: AppColors.teal,
-              content: Text('Sunward Solar is up to date (${result.currentVersion}).'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
-          break;
-        case AppUpdateStatus.error:
-          _updateStatusMessage = result.message ?? 'Could not connect to GitHub. You can still download the APK below.';
-          break;
-        case AppUpdateStatus.idle:
-        case AppUpdateStatus.checking:
-          break;
+      if (info.hasUpdate) {
+        setState(() {
+          _updateStatusMessage = 'New version ${info.latestVersion} is available!';
+        });
+        _showUpdateDialog(info);
+      } else {
+        setState(() {
+          _updateStatusMessage = 'Sunward Solar is up to date (${info.currentVersion})';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.teal,
+            content: Text('Sunward Solar is up to date (${info.currentVersion})'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isCheckingUpdate = false;
+        _updateStatusMessage = 'Could not check updates: $e';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.coral,
+          content: Text('Could not check updates: $e'),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
-  void _showUpdateDialog(AppReleaseInfo release) {
+  void _showUpdateDialog(AppUpdateInfo info) {
     final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
@@ -140,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Icon(Icons.system_update, color: AppColors.teal),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text('Update to ${release.version}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    child: Text('Update to ${info.latestVersion}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                   ),
                 ],
               ),
@@ -149,11 +150,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'A new version (${release.version}) is available. Current version is ${AppUpdateService.currentVersion}.',
+                    'A new version (${info.latestVersion}) is available. Current version is ${info.currentVersion}.',
                     style: const TextStyle(fontSize: 13, color: AppColors.ink),
                   ),
                   const SizedBox(height: 12),
-                  if (release.notes.isNotEmpty) ...[
+                  if (info.notes.isNotEmpty) ...[
                     const Text("What's New:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
@@ -165,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       child: SingleChildScrollView(
                         child: Text(
-                          release.notes,
+                          info.notes,
                           style: const TextStyle(fontSize: 11.5, color: AppColors.ink, height: 1.35),
                         ),
                       ),
@@ -205,8 +206,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       });
 
                       try {
-                        final file = await AppUpdateService.downloadAndInstall(
-                          downloadUrl: release.apkDownloadUrl,
+                        final success = await AppUpdateService.startDownloadAndInstall(
+                          downloadUrl: info.downloadUrl,
                           onProgress: (prog, rec, tot) {
                             setModalState(() {
                               downloadProgress = prog;
@@ -219,11 +220,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                         }
-                        if (file != null && mounted) {
+                        if (success && mounted) {
                           messenger.showSnackBar(
                             const SnackBar(
                               backgroundColor: AppColors.teal,
-                              content: Text('Update downloaded! Launching installer... If prompted for security scan, select "Don\'t scan" or "Install anyway".'),
+                              content: Text('Update downloaded! Launching installer...'),
                               duration: Duration(seconds: 4),
                             ),
                           );
@@ -244,60 +245,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
-  }
-
-  Future<void> _startInAppDownload(AppReleaseInfo update) async {
-    if (kIsWeb) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.teal,
-          content: Text('Starting download for ${update.version} (${update.formattedSize})...'),
-          duration: const Duration(seconds: 3),
-        ),
-      );
-      await AppUpdateService.openUrl(update.apkDownloadUrl);
-      return;
-    }
-
-    setState(() {
-      _isDownloading = true;
-      _downloadProgress = 0.0;
-    });
-
-    final file = await AppUpdateService.downloadAndInstall(
-      downloadUrl: update.apkDownloadUrl,
-      onProgress: (p, rec, tot) {
-        if (mounted) {
-          setState(() => _downloadProgress = p);
-        }
-      },
-    );
-
-    if (!mounted) return;
-
-    setState(() => _isDownloading = false);
-
-    if (file != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: AppColors.teal,
-          content: Text('Update downloaded! Launching installer... If prompted for security scan, select "Don\'t scan" or "Install anyway".'),
-          duration: Duration(seconds: 4),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.coral,
-          content: const Text('Failed to download update. Please check internet connection or open in browser.'),
-          action: SnackBarAction(
-            label: 'Browser',
-            textColor: Colors.white,
-            onPressed: () => AppUpdateService.openUrl(update.apkDownloadUrl),
-          ),
-        ),
-      );
-    }
   }
 
   @override
@@ -392,9 +339,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   Row(
                                     children: [
-                                      const Text(
-                                        'Version: ${AppUpdateService.currentVersion}',
-                                        style: TextStyle(fontSize: 12, color: AppColors.muted),
+                                      Text(
+                                        'Version: ${_updateInfo?.currentVersion ?? "0.1.4"}',
+                                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
                                       ),
                                       if (_lastCheckedAt != null) ...[
                                         const SizedBox(width: 8),
@@ -410,251 +357,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ],
                         ),
+                        if (_updateStatusMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _updateStatusMessage!,
+                            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                          ),
+                        ],
                         const SizedBox(height: 14),
-
-                        // Status Banner
-                        if (_updateStatusMessage.isNotEmpty) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: _updateStatus == AppUpdateStatus.updateAvailable
-                                  ? AppColors.sun.withValues(alpha: 0.2)
-                                  : (_updateStatus == AppUpdateStatus.error
-                                      ? AppColors.coral.withValues(alpha: 0.15)
-                                      : AppColors.teal.withValues(alpha: 0.1)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: _updateStatus == AppUpdateStatus.updateAvailable
-                                    ? AppColors.sun
-                                    : (_updateStatus == AppUpdateStatus.error
-                                        ? AppColors.coral.withValues(alpha: 0.4)
-                                        : AppColors.teal.withValues(alpha: 0.3)),
-                              ),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.ink,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _updateStatus == AppUpdateStatus.updateAvailable
-                                      ? Icons.new_releases_rounded
-                                      : (_updateStatus == AppUpdateStatus.error
-                                          ? Icons.error_outline_rounded
-                                          : Icons.check_circle_outline_rounded),
-                                  size: 20,
-                                  color: _updateStatus == AppUpdateStatus.updateAvailable
-                                      ? AppColors.ink
-                                      : (_updateStatus == AppUpdateStatus.error ? AppColors.coral : AppColors.teal),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _updateStatusMessage,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: _updateStatus == AppUpdateStatus.updateAvailable
-                                          ? AppColors.ink
-                                          : (_updateStatus == AppUpdateStatus.error ? AppColors.coral : AppColors.teal),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            icon: _isCheckingUpdate
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.refresh_rounded, size: 20),
+                            label: Text(
+                              _isCheckingUpdate ? 'Checking for Updates...' : 'Check For App Updates',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
+                            onPressed: _isCheckingUpdate ? null : _checkForUpdates,
                           ),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // Release Notes Box (shown if release info exists)
-                        if (_latestRelease != null && !_isDownloading) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.cream.withValues(alpha: 0.4),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.cream),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      "What's New in ${_latestRelease!.version}:",
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ink),
-                                    ),
-                                    Text(
-                                      _latestRelease!.formattedSize,
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _latestRelease!.notes,
-                                  style: const TextStyle(fontSize: 12, color: AppColors.ink, height: 1.4),
-                                  maxLines: 6,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // Downloading Progress Bar
-                        if (_isDownloading) ...[
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text('Downloading update...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                  Text('${(_downloadProgress * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              LinearProgressIndicator(
-                                value: _downloadProgress,
-                                backgroundColor: AppColors.cream,
-                                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
-                                minHeight: 8,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Package installer will trigger automatically upon download completion.',
-                                style: TextStyle(fontSize: 11, color: AppColors.muted),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-
-                        // Action Buttons
-                        if (!_isDownloading) ...[
-                          // Primary Install Button if update is available
-                          if (_updateStatus == AppUpdateStatus.updateAvailable && _latestRelease != null) ...[
-                            SizedBox(
-                              width: double.infinity,
-                              height: 46,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.teal,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                icon: const Icon(Icons.download_for_offline_outlined, size: 20),
-                                label: Text(
-                                  'Download & Install ${_latestRelease!.version} (${_latestRelease!.formattedSize})',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                onPressed: () => _startInAppDownload(_latestRelease!),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-
-                          // Secondary Re-download / Install APK button if up-to-date or fallback
-                          if ((_updateStatus == AppUpdateStatus.upToDate || _updateStatus == AppUpdateStatus.error) && _latestRelease != null) ...[
-                            SizedBox(
-                              width: double.infinity,
-                              height: 42,
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppColors.teal,
-                                  side: const BorderSide(color: AppColors.teal, width: 1.2),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                icon: const Icon(Icons.file_download_outlined, size: 18),
-                                label: Text(
-                                  'Download Sunward.apk (${_latestRelease!.formattedSize})',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                ),
-                                onPressed: () => _startInAppDownload(_latestRelease!),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-
-                          // Check For Updates Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 46,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.ink,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              icon: _isCheckingUpdate
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Icon(Icons.refresh_rounded, size: 20),
-                              label: Text(
-                                _isCheckingUpdate ? 'Checking GitHub...' : 'Check For App Updates',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: _isCheckingUpdate ? null : _checkForUpdates,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Direct Web Links
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              TextButton.icon(
-                                style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                                icon: const Icon(Icons.open_in_browser_rounded, size: 16),
-                                label: const Text(
-                                  'Releases Page',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                ),
-                                onPressed: () => AppUpdateService.openUrl(
-                                  _latestRelease?.releasePageUrl ?? AppUpdateService.defaultReleasePageUrl,
-                                ),
-                              ),
-                              const Text('•', style: TextStyle(color: AppColors.muted)),
-                              TextButton.icon(
-                                style: TextButton.styleFrom(foregroundColor: AppColors.muted, padding: const EdgeInsets.symmetric(horizontal: 8)),
-                                icon: const Icon(Icons.download_rounded, size: 16),
-                                label: const Text(
-                                  'Direct APK Link',
-                                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                ),
-                                onPressed: () => AppUpdateService.openUrl(
-                                  _latestRelease?.apkDownloadUrl ?? AppUpdateService.defaultDirectApkUrl,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.sun.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Icon(Icons.security_outlined, size: 16, color: AppColors.ink),
-                                SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Installation Tip: If your phone prompts with a security scan or Play Protect check, select "Don\'t scan" or "Install anyway" to proceed.',
-                                    style: TextStyle(fontSize: 11, color: AppColors.ink, height: 1.3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ],
                     ),
                   ),

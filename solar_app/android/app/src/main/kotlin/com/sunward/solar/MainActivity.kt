@@ -13,16 +13,45 @@ import java.io.File
 class MainActivity: FlutterActivity() {
     private val UPDATER_CHANNEL = "com.sunward.updater"
     private val WHATSAPP_CHANNEL = "com.sunward.solar/whatsapp"
+    private var appUpdater: AppUpdater? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // 1. In-App Updater Channel (Settlr architecture)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATER_CHANNEL).setMethodCallHandler { call, result ->
-            if (call.method == "installApk") {
-                handleInstallApk(call.argument<String>("filePath"), result)
-            } else {
-                result.notImplemented()
+        // 1. Native Kotlin Updater Channel
+        val updaterChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATER_CHANNEL)
+        val updater = AppUpdater(this, updaterChannel)
+        appUpdater = updater
+
+        updaterChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "checkForUpdate" -> {
+                    updater.checkForUpdate(result)
+                }
+                "downloadAndInstall" -> {
+                    val downloadUrl = call.argument<String>("downloadUrl")
+                    if (downloadUrl != null) {
+                        updater.downloadAndInstall(downloadUrl, result)
+                    } else {
+                        result.error("INVALID_URL", "downloadUrl cannot be null", null)
+                    }
+                }
+                "installApk" -> {
+                    val filePath = call.argument<String>("filePath")
+                    if (filePath != null) {
+                        updater.installApk(File(filePath), result)
+                    } else {
+                        result.error("INVALID_PATH", "filePath cannot be null", null)
+                    }
+                }
+                "canRequestPackageInstalls" -> {
+                    result.success(updater.canRequestPackageInstalls())
+                }
+                "openInstallPermissionSettings" -> {
+                    updater.openInstallPermissionSettings()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
             }
         }
 

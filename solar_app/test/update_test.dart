@@ -1,46 +1,56 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:solar_app/services/app_update_service.dart';
 
 void main() {
-  test('AppUpdateService.checkForUpdate connects and parses latest release', () async {
-    final result = await AppUpdateService.checkForUpdate();
-    expect(result.status, isNot(AppUpdateStatus.error));
-    expect(result.release, isNotNull);
-    expect(result.release!.version, startsWith('v'));
-    expect(result.release!.apkDownloadUrl, contains('Sunward.apk'));
-    expect(result.release!.formattedSize, isNotEmpty);
-  });
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('isVersionNewer logic tests', () {
-    expect(AppUpdateService.isVersionNewer('v0.1.4', 'v0.1.3'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.2.0', 'v0.1.3'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v1.0.0', 'v0.1.3'), isTrue);
-    expect(AppUpdateService.isVersionNewer('v0.1.3', 'v0.1.3'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.1.2', 'v0.1.3'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.1.1', 'v0.1.3'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.1.0', 'v0.1.3'), isFalse);
-    expect(AppUpdateService.isVersionNewer('v0.0.9', 'v0.1.3'), isFalse);
-  });
-
-  test('AppReleaseInfo formattedSize tests', () {
-    const info1 = AppReleaseInfo(
-      version: 'v0.0.9',
-      title: 'v0.0.9',
-      notes: 'Notes',
-      apkDownloadUrl: 'https://example.com/app.apk',
-      apkSizeBytes: 54245959,
-      releasePageUrl: 'https://example.com',
+  test('AppUpdateInfo formattedSize tests', () {
+    const info1 = AppUpdateInfo(
+      hasUpdate: true,
+      currentVersion: '0.1.3',
+      latestVersion: '0.1.4',
+      downloadUrl: 'https://example.com/app.apk',
+      size: 54245959,
+      notes: 'New release',
     );
     expect(info1.formattedSize, equals('51.7 MB'));
 
-    const info2 = AppReleaseInfo(
-      version: 'v0.0.9',
-      title: 'v0.0.9',
-      notes: 'Notes',
-      apkDownloadUrl: 'https://example.com/app.apk',
-      apkSizeBytes: 0,
-      releasePageUrl: 'https://example.com',
+    const info2 = AppUpdateInfo(
+      hasUpdate: false,
+      currentVersion: '0.1.4',
+      latestVersion: '0.1.4',
+      downloadUrl: '',
+      size: 0,
+      notes: '',
     );
-    expect(info2.formattedSize, equals('51.7 MB'));
+    expect(info2.formattedSize, equals('55 MB'));
+  });
+
+  test('AppUpdateService.checkForUpdate handles native channel response', () async {
+    const channel = MethodChannel('com.sunward.updater');
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+      if (methodCall.method == 'checkForUpdate') {
+        return {
+          'hasUpdate': true,
+          'currentVersion': '0.1.3',
+          'latestVersion': '0.1.4',
+          'downloadUrl': 'https://github.com/SuveshTheCoder/sunward-releases/releases/download/v0.1.4/Sunward.apk',
+          'size': 54245959,
+          'notes': 'Bug fixes and performance improvements',
+        };
+      }
+      return null;
+    });
+
+    final updateInfo = await AppUpdateService.checkForUpdate();
+    expect(updateInfo.hasUpdate, isTrue);
+    expect(updateInfo.currentVersion, equals('0.1.3'));
+    expect(updateInfo.latestVersion, equals('0.1.4'));
+    expect(updateInfo.downloadUrl, contains('Sunward.apk'));
+    expect(updateInfo.formattedSize, equals('51.7 MB'));
+    expect(updateInfo.notes, contains('Bug fixes'));
   });
 }
