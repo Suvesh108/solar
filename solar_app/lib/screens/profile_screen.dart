@@ -97,9 +97,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       switch (result.status) {
         case AppUpdateStatus.updateAvailable:
           _updateStatusMessage = 'New version ${result.release?.version ?? result.latestVersion} is available!';
+          if (result.release != null) {
+            _showUpdateDialog(result.release!);
+          }
           break;
         case AppUpdateStatus.upToDate:
           _updateStatusMessage = 'You are already running the latest version (${result.currentVersion}).';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.teal,
+              content: Text('Sunward Solar is up to date (${result.currentVersion}).'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
           break;
         case AppUpdateStatus.error:
           _updateStatusMessage = result.message ?? 'Could not connect to GitHub. You can still download the APK below.';
@@ -109,6 +119,131 @@ class _ProfileScreenState extends State<ProfileScreen> {
           break;
       }
     });
+  }
+
+  void _showUpdateDialog(AppReleaseInfo release) {
+    final messenger = ScaffoldMessenger.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        double downloadProgress = 0.0;
+        bool isDownloading = false;
+        String downloadStatus = '';
+
+        return StatefulBuilder(
+          builder: (dialogContext, setModalState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  const Icon(Icons.system_update, color: AppColors.teal),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Update to ${release.version}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'A new version (${release.version}) is available. Current version is ${AppUpdateService.currentVersion}.',
+                    style: const TextStyle(fontSize: 13, color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 12),
+                  if (release.notes.isNotEmpty) ...[
+                    const Text("What's New:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const SizedBox(height: 4),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 130),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.cream.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Text(
+                          release.notes,
+                          style: const TextStyle(fontSize: 11.5, color: AppColors.ink, height: 1.35),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  if (isDownloading) ...[
+                    LinearProgressIndicator(
+                      value: downloadProgress > 0 ? downloadProgress : null,
+                      backgroundColor: AppColors.cream,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.teal),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      downloadStatus,
+                      style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                if (!isDownloading) ...[
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Later'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () async {
+                      setModalState(() {
+                        isDownloading = true;
+                        downloadStatus = 'Downloading update package...';
+                      });
+
+                      try {
+                        final file = await AppUpdateService.downloadAndInstall(
+                          downloadUrl: release.apkDownloadUrl,
+                          onProgress: (prog, rec, tot) {
+                            setModalState(() {
+                              downloadProgress = prog;
+                              final mbRec = (rec / (1024 * 1024)).toStringAsFixed(1);
+                              final mbTot = (tot / (1024 * 1024)).toStringAsFixed(1);
+                              downloadStatus = '$mbRec MB / $mbTot MB (${(prog * 100).toInt()}%)';
+                            });
+                          },
+                        );
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        if (file != null && mounted) {
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              backgroundColor: AppColors.teal,
+                              content: Text('Update downloaded! Launching installer... If prompted for security scan, select "Don\'t scan" or "Install anyway".'),
+                              duration: Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setModalState(() {
+                          isDownloading = false;
+                          downloadStatus = 'Install failed: $e';
+                        });
+                      }
+                    },
+                    child: const Text('Update Now', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _startInAppDownload(AppReleaseInfo update) async {
@@ -129,9 +264,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _downloadProgress = 0.0;
     });
 
-    final file = await AppUpdateService.downloadAndInstallApk(
-      apkUrl: update.apkDownloadUrl,
-      onProgress: (p) {
+    final file = await AppUpdateService.downloadAndInstall(
+      downloadUrl: update.apkDownloadUrl,
+      onProgress: (p, rec, tot) {
         if (mounted) {
           setState(() => _downloadProgress = p);
         }
@@ -257,9 +392,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   Row(
                                     children: [
-                                      Text(
+                                      const Text(
                                         'Version: ${AppUpdateService.currentVersion}',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                                        style: TextStyle(fontSize: 12, color: AppColors.muted),
                                       ),
                                       if (_lastCheckedAt != null) ...[
                                         const SizedBox(width: 8),

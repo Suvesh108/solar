@@ -11,12 +11,23 @@ import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.sunward.solar/whatsapp"
+    private val UPDATER_CHANNEL = "com.sunward.updater"
+    private val WHATSAPP_CHANNEL = "com.sunward.solar/whatsapp"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        // 1. In-App Updater Channel (Settlr architecture)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, UPDATER_CHANNEL).setMethodCallHandler { call, result ->
+            if (call.method == "installApk") {
+                handleInstallApk(call.argument<String>("filePath"), result)
+            } else {
+                result.notImplemented()
+            }
+        }
+
+        // 2. WhatsApp & Legacy Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WHATSAPP_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "sendWhatsAppImage" -> {
                     val filePath = call.argument<String>("filePath")
@@ -87,45 +98,48 @@ class MainActivity: FlutterActivity() {
                     }
                 }
                 "installApk" -> {
-                    val filePath = call.argument<String>("filePath")
-                    if (filePath != null) {
-                        try {
-                            val file = File(filePath)
-                            if (!file.exists()) {
-                                result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
-                                return@setMethodCallHandler
-                            }
-                            val context = applicationContext
-                            val uri: Uri = FileProvider.getUriForFile(
-                                context,
-                                "${context.packageName}.fileprovider",
-                                file
-                            )
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(uri, "application/vnd.android.package-archive")
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                            }
-                            val resInfoList = context.packageManager.queryIntentActivities(
-                                intent,
-                                PackageManager.MATCH_DEFAULT_ONLY
-                            )
-                            for (resolveInfo in resInfoList) {
-                                val packageName = resolveInfo.activityInfo.packageName
-                                context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                            }
-                            context.startActivity(intent)
-                            result.success(true)
-                        } catch (e: Exception) {
-                            result.error("INSTALL_ERROR", e.localizedMessage, null)
-                        }
-                    } else {
-                        result.error("INVALID_PATH", "Path is null", null)
-                    }
+                    handleInstallApk(call.argument<String>("filePath"), result)
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun handleInstallApk(filePath: String?, result: MethodChannel.Result) {
+        if (filePath != null) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) {
+                    result.error("FILE_NOT_FOUND", "File not found: $filePath", null)
+                    return
+                }
+                val context = applicationContext
+                val uri: Uri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    file
+                )
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, "application/vnd.android.package-archive")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                }
+                val resInfoList = context.packageManager.queryIntentActivities(
+                    intent,
+                    PackageManager.MATCH_DEFAULT_ONLY
+                )
+                for (resolveInfo in resInfoList) {
+                    val packageName = resolveInfo.activityInfo.packageName
+                    context.grantUriPermission(packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(intent)
+                result.success(true)
+            } catch (e: Exception) {
+                result.error("INSTALL_ERROR", e.localizedMessage, null)
+            }
+        } else {
+            result.error("INVALID_PATH", "Path is null", null)
         }
     }
 }

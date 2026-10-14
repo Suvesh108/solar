@@ -57,7 +57,7 @@ class AppUpdateResult {
 }
 
 class AppUpdateService {
-  static const String currentVersion = 'v0.1.3';
+  static const String currentVersion = 'v0.1.4';
   static const String githubOwner = 'Suvesh108';
   static const String githubRepo = 'solar';
 
@@ -311,13 +311,16 @@ class AppUpdateService {
     }
   }
 
-  /// In-app APK download and trigger installation
-  static Future<File?> downloadAndInstallApk({
-    required String apkUrl,
-    required void Function(double progress) onProgress,
+  static const MethodChannel _updaterChannel = MethodChannel('com.sunward.updater');
+  static const MethodChannel _legacyChannel = MethodChannel('com.sunward.solar/whatsapp');
+
+  /// Downloads the APK directly inside the app with live stream progress, then invokes system installer
+  static Future<File?> downloadAndInstall({
+    required String downloadUrl,
+    required void Function(double progress, int received, int total) onProgress,
   }) async {
     if (kIsWeb) {
-      await openUrl(apkUrl);
+      await openUrl(downloadUrl);
       return null;
     }
 
@@ -332,7 +335,7 @@ class AppUpdateService {
 
     final client = http.Client();
     try {
-      final request = http.Request('GET', Uri.parse(apkUrl));
+      final request = http.Request('GET', Uri.parse(downloadUrl));
       request.headers['User-Agent'] = 'SunwardSolar-App/$currentVersion';
       request.headers['Accept'] = '*/*';
 
@@ -350,16 +353,25 @@ class AppUpdateService {
         sink.add(chunk);
         receivedBytes += chunk.length;
         if (totalBytes > 0) {
-          onProgress((receivedBytes / totalBytes).clamp(0.0, 1.0));
+          onProgress(
+            (receivedBytes / totalBytes).clamp(0.0, 1.0),
+            receivedBytes,
+            totalBytes,
+          );
         } else {
-          onProgress(0.0);
+          onProgress(0.0, receivedBytes, 0);
         }
       }
       await sink.flush();
       await sink.close();
 
-      const platform = MethodChannel('com.sunward.solar/whatsapp');
-      await platform.invokeMethod('installApk', {'filePath': apkFile.path});
+      // Trigger native package installer via MethodChannel (primary com.sunward.updater, fallback legacy)
+      try {
+        await _updaterChannel.invokeMethod('installApk', {'filePath': apkFile.path});
+      } catch (e) {
+        debugPrint('[AppUpdateService] Primary updater channel failed, falling back to legacy: $e');
+        await _legacyChannel.invokeMethod('installApk', {'filePath': apkFile.path});
+      }
       return apkFile;
     } catch (e) {
       debugPrint('[AppUpdateService] Download error: $e');
@@ -367,6 +379,17 @@ class AppUpdateService {
     } finally {
       client.close();
     }
+  }
+
+  /// In-app APK download and trigger installation (backwards-compatible overload)
+  static Future<File?> downloadAndInstallApk({
+    required String apkUrl,
+    required void Function(double progress) onProgress,
+  }) async {
+    return downloadAndInstall(
+      downloadUrl: apkUrl,
+      onProgress: (prog, _, __) => onProgress(prog),
+    );
   }
 
   /// Check if the app is authorized to install APK updates directly
